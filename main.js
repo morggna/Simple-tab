@@ -1,4 +1,4 @@
-// 默认数据
+// 默认数据 (包含内容、外观、以及 WebDAV 设置)
 var defaultData = {
   groups: [
     {
@@ -6,8 +6,7 @@ var defaultData = {
       icon: '💻',
       links: [
         { name: 'Github', url: 'https://github.com' },
-        { name: 'Stack Overflow', url: 'https://stackoverflow.com' },
-        { name: 'CodePen', url: 'https://codepen.io' }
+        { name: 'Stack Overflow', url: 'https://stackoverflow.com' }
       ]
     },
     {
@@ -15,29 +14,23 @@ var defaultData = {
       icon: '⭐',
       links: [
         { name: 'YouTube', url: 'https://youtube.com' },
-        { name: 'Twitter', url: 'https://twitter.com' },
-        { name: 'Reddit', url: 'https://reddit.com' }
+        { name: 'Bilibili', url: 'https://www.bilibili.com' }
       ]
     }
   ],
   searchEngine: 'google',
   bgUrl: '',
+  // 外观设置
+  theme: 'light',
   opacityLight: 85,
-  opacityDark: 85
-};
-
-// 立即应用主题（在 DOM 解析早期）
-(function() {
-  var theme = localStorage.getItem('theme');
-  if (theme === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
+  opacityDark: 85,
+  // WebDAV 设置 (新加入)
+  webdav: {
+    url: '',
+    user: '',
+    pass: ''
   }
-  // 应用保存的透明度
-  var opacityLight = localStorage.getItem('opacityLight') || 85;
-  var opacityDark = localStorage.getItem('opacityDark') || 85;
-  document.documentElement.style.setProperty('--opacity-light', opacityLight / 100);
-  document.documentElement.style.setProperty('--opacity-dark', opacityDark / 100);
-})();
+};
 
 var data = null;
 var currentGroupIndex = null;
@@ -45,15 +38,13 @@ var currentLinkIndex = null;
 var urlInputTimer = null;
 var customIconBase64 = null;
 
-// 搜索引擎
 var searchEngines = {
   google: { name: 'Google', url: 'https://www.google.com/search?q=' },
   bing: { name: 'Bing', url: 'https://www.bing.com/search?q=' },
   baidu: { name: '百度', url: 'https://www.baidu.com/s?wd=' }
 };
 
-// 【新增】标准化 JSON 字符串转换（解决属性顺序不同导致的对比失败问题）
-// 确保 {a:1, b:2} 和 {b:2, a:1} 转换出的字符串完全一致
+// 标准化 JSON 字符串转换
 function canonicalStringify(obj) {
   if (obj === null || typeof obj !== 'object') {
     return JSON.stringify(obj);
@@ -68,46 +59,72 @@ function canonicalStringify(obj) {
   return '{' + parts.join(',') + '}';
 }
 
-// 获取图标
 function getIconUrl(url, size) {
   try {
     var domain = new URL(url).hostname;
     return 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=' + (size || 64);
-  } catch (e) {
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
-// 从 URL 获取名称
 function getDomainName(url) {
   try {
     var hostname = new URL(url).hostname.replace(/^www\./, '');
     var name = hostname.split('.')[0];
     return name.charAt(0).toUpperCase() + name.slice(1);
-  } catch (e) {
-    return 'Link';
-  }
+  } catch (e) { return 'Link'; }
 }
 
 // 加载数据
 function loadData() {
   if (typeof chrome !== 'undefined' && chrome.storage) {
     chrome.storage.sync.get(['newtabData'], function(result) {
-      data = result.newtabData || defaultData;
-      render();
-      // 启动时检查云端同步
-      setTimeout(checkCloudSync, 500);
+      initData(result.newtabData);
     });
   } else {
     var saved = localStorage.getItem('newtabData');
-    data = saved ? JSON.parse(saved) : defaultData;
-    render();
-    // 启动时检查云端同步
-    setTimeout(checkCloudSync, 500);
+    initData(saved ? JSON.parse(saved) : null);
   }
 }
 
-// 保存数据
+// 初始化数据（包含极其重要的数据迁移逻辑）
+function initData(loadedData) {
+  if (loadedData) {
+    data = loadedData;
+    
+    // 1. 迁移外观设置 (兼容旧版)
+    if (typeof data.theme === 'undefined') data.theme = localStorage.getItem('theme') || 'light';
+    if (typeof data.opacityLight === 'undefined') data.opacityLight = localStorage.getItem('opacityLight') || 85;
+    if (typeof data.opacityDark === 'undefined') data.opacityDark = localStorage.getItem('opacityDark') || 85;
+    
+    // 2. 迁移 WebDAV 设置 (兼容旧版)
+    // 如果 data 里没有 webdav 字段，但 localStorage 里有旧的 webdavConfig，把它吸入 data
+    if (!data.webdav) {
+      var oldConfig = localStorage.getItem('webdavConfig');
+      if (oldConfig) {
+        try {
+          data.webdav = JSON.parse(oldConfig);
+        } catch(e) { data.webdav = { url:'', user:'', pass:'' }; }
+      } else {
+        data.webdav = { url:'', user:'', pass:'' };
+      }
+    }
+  } else {
+    data = defaultData;
+    // 即使是新用户，也检查一下有没有残留的 WebDAV 配置
+    var oldConfig = localStorage.getItem('webdavConfig');
+    if (oldConfig) {
+       try { data.webdav = JSON.parse(oldConfig); } catch(e) {}
+    }
+  }
+  
+  // 必须确保 data.webdav 结构完整，防止报错
+  if (!data.webdav) data.webdav = { url:'', user:'', pass:'' };
+  
+  render();
+  setTimeout(checkCloudSync, 500);
+}
+
+// 保存数据 (统一入口，保存一切)
 function saveData() {
   if (typeof chrome !== 'undefined' && chrome.storage) {
     chrome.storage.sync.set({ newtabData: data });
@@ -115,30 +132,36 @@ function saveData() {
     localStorage.setItem('newtabData', JSON.stringify(data));
   }
   
-  // 自动同步到 WebDAV（如果已配置）
+  // 顺便更新一下 localStorage 的独立项作为备份，虽然主要逻辑已转到 data
+  localStorage.setItem('theme', data.theme);
+  
+  // 触发自动同步
   autoSyncToWebdav();
 }
 
-// 【优化】自动同步到 WebDAV（带轻微视觉反馈）
+// 自动同步到 WebDAV
 function autoSyncToWebdav() {
-  loadWebdavConfig();
-  if (!webdavConfig.url || !webdavConfig.user) return;
+  // 直接从 data.webdav 读取，不再读取 localStorage
+  var cfg = data.webdav;
+  if (!cfg || !cfg.url || !cfg.user) return;
   
-  var fileUrl = webdavConfig.url.replace(/\/$/, '') + '/newtab-config.json';
+  var fileUrl = cfg.url.replace(/\/$/, '') + '/newtab-config.json';
   var settingsBtn = document.getElementById('settingsBtn');
   
   fetch(fileUrl, {
     method: 'PUT',
     headers: {
-      'Authorization': 'Basic ' + btoa(webdavConfig.user + ':' + webdavConfig.pass),
+      'Authorization': 'Basic ' + btoa(cfg.user + ':' + cfg.pass),
       'Content-Type': 'application/json'
     },
+    // 注意：这里上传的是包含密码的 data。
+    // 如果你介意密码上传到云端，可以在这里这里构造一个副本 delete copy.webdav 再上传
+    // 但根据你的需求“同步设置”，这里必须上传。
     body: JSON.stringify(data, null, 2)
   })
   .then(function(response) {
     if (response.ok || response.status === 201 || response.status === 204) {
       console.log('自动同步成功');
-      // 成功反馈：齿轮变绿 1.5秒
       if(settingsBtn) {
         settingsBtn.style.color = '#27ae60';
         setTimeout(function() { settingsBtn.style.color = ''; }, 1500);
@@ -149,7 +172,6 @@ function autoSyncToWebdav() {
   })
   .catch(function(err) {
     console.error('自动同步失败', err);
-    // 失败反馈：齿轮变红 3秒
     if(settingsBtn) {
         settingsBtn.style.color = '#e74c3c';
         setTimeout(function() { settingsBtn.style.color = ''; }, 3000);
@@ -157,17 +179,17 @@ function autoSyncToWebdav() {
   });
 }
 
-// 【修复】启动时检查云端同步（使用 canonicalStringify）
+// 检查云端同步
 function checkCloudSync() {
-  loadWebdavConfig();
-  if (!webdavConfig.url || !webdavConfig.user) return;
+  var cfg = data.webdav;
+  if (!cfg || !cfg.url || !cfg.user) return;
   
-  var fileUrl = webdavConfig.url.replace(/\/$/, '') + '/newtab-config.json';
+  var fileUrl = cfg.url.replace(/\/$/, '') + '/newtab-config.json';
   
   fetch(fileUrl, {
     method: 'GET',
     headers: {
-      'Authorization': 'Basic ' + btoa(webdavConfig.user + ':' + webdavConfig.pass)
+      'Authorization': 'Basic ' + btoa(cfg.user + ':' + cfg.pass)
     }
   })
   .then(function(response) {
@@ -177,27 +199,18 @@ function checkCloudSync() {
   .then(function(remoteData) {
     if (!remoteData || !remoteData.groups) return;
     
-    // 使用标准化字符串进行对比，忽略 Key 的顺序差异
     var localStr = canonicalStringify(data);
     var remoteStr = canonicalStringify(remoteData);
     
-    // 调试日志，按 F12 可见
-    console.log('检查同步 - 本地长度:', localStr.length, '云端长度:', remoteStr.length);
-    
     if (localStr !== remoteStr) {
-      console.log('数据不一致，弹出提示');
       showSyncPrompt(remoteData);
-    } else {
-      console.log('数据一致，无需同步');
     }
   })
   .catch(function(err) {
-    // 网络错误静默忽略
     console.warn('检查同步出错:', err);
   });
 }
 
-// 显示同步提示
 function showSyncPrompt(remoteData) {
   var modal = document.getElementById('syncModal');
   if (modal) {
@@ -206,41 +219,63 @@ function showSyncPrompt(remoteData) {
   }
 }
 
-// 应用远程数据
 function applyRemoteData() {
   if (window.pendingRemoteData) {
-    data = window.pendingRemoteData;
-    // 保存到本地但不触发自动上传 (防止循环)
-    if (typeof chrome !== 'undefined' && chrome.storage) {
-      chrome.storage.sync.set({ newtabData: data });
-    } else {
-      localStorage.setItem('newtabData', JSON.stringify(data));
+    // 覆盖本地数据
+    var remote = window.pendingRemoteData;
+    
+    // 保护逻辑：如果云端数据是旧版本（没有 webdav 字段），不要把本地的 webdav 配置覆盖没了
+    if (!remote.webdav && data.webdav) {
+      remote.webdav = data.webdav;
     }
+    // 如果云端是旧版本（没有 theme），给默认值
+    if (typeof remote.theme === 'undefined') remote.theme = 'light';
+    
+    data = remote;
+    saveData();
     render();
     window.pendingRemoteData = null;
   }
   document.getElementById('syncModal').classList.remove('active');
 }
 
-// 【优化】保留本地数据
 function keepLocalData() {
   window.pendingRemoteData = null;
   document.getElementById('syncModal').classList.remove('active');
-  
-  // 关键逻辑：既然保留本地，说明本地是最新的
-  // 立即强制上传覆盖云端，防止下次刷新再次弹窗
-  console.log('用户选择保留本地，正在覆盖云端...');
+  console.log('保留本地，强制覆盖云端...');
   autoSyncToWebdav(); 
 }
 
-// 渲染
+// --- 渲染与交互 ---
+
 function render() {
   renderGroups();
   renderSearchEngine();
   applyBackground();
+  applyThemeAndOpacity();
 }
 
-// 应用背景
+function applyThemeAndOpacity() {
+  if (data.theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    document.getElementById('themeToggle').textContent = '☀️';
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    document.getElementById('themeToggle').textContent = '🌙';
+  }
+
+  var opL = (data.opacityLight || 85) / 100;
+  var opD = (data.opacityDark || 85) / 100;
+  document.documentElement.style.setProperty('--opacity-light', opL);
+  document.documentElement.style.setProperty('--opacity-dark', opD);
+
+  // 如果设置弹窗是打开的，实时更新输入框的值
+  var elL = document.getElementById('opacityLight');
+  var elD = document.getElementById('opacityDark');
+  if (elL) { elL.value = data.opacityLight || 85; document.getElementById('opacityLightVal').textContent = elL.value + '%'; }
+  if (elD) { elD.value = data.opacityDark || 85; document.getElementById('opacityDarkVal').textContent = elD.value + '%'; }
+}
+
 function applyBackground() {
   if (data.bgUrl) {
     var img = new Image();
@@ -255,23 +290,17 @@ function applyBackground() {
   }
 }
 
-// 渲染搜索引擎
 function renderSearchEngine() {
   var engines = document.querySelectorAll('.search-engine');
   engines.forEach(function(el) {
     var engine = el.getAttribute('data-engine');
-    if (engine === data.searchEngine) {
-      el.classList.add('active');
-    } else {
-      el.classList.remove('active');
-    }
+    if (engine === data.searchEngine) el.classList.add('active');
+    else el.classList.remove('active');
   });
-  
   var placeholder = '使用 ' + searchEngines[data.searchEngine].name + ' 搜索...';
   document.getElementById('searchInput').placeholder = placeholder;
 }
 
-// 渲染分组
 function renderGroups() {
   var container = document.getElementById('groupsContainer');
   var html = '';
@@ -321,89 +350,63 @@ function renderGroups() {
 var isEditMode = false;
 var editingGroupIndex = null;
 
-// 绑定事件
 function bindEvents() {
-  // 添加链接按钮
-  var addLinkBtns = document.querySelectorAll('.add-link-btn');
-  addLinkBtns.forEach(function(btn) {
+  // 1. 添加链接
+  document.querySelectorAll('.add-link-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       currentGroupIndex = parseInt(this.getAttribute('data-group-index'));
       openLinkModal();
     });
   });
 
-  // 链接编辑图标 - 修改链接
-  var linkEditIcons = document.querySelectorAll('.link-edit-icon');
-  linkEditIcons.forEach(function(icon) {
+  // 2. 编辑链接
+  document.querySelectorAll('.link-edit-icon').forEach(function(icon) {
     icon.addEventListener('click', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      var groupIndex = parseInt(this.getAttribute('data-group'));
-      var linkIndex = parseInt(this.getAttribute('data-link'));
-      openEditLinkModal(groupIndex, linkIndex);
+      e.preventDefault(); e.stopPropagation();
+      openEditLinkModal(parseInt(this.getAttribute('data-group')), parseInt(this.getAttribute('data-link')));
     });
   });
 
-  // 删除链接
-  var deleteLinkBtns = document.querySelectorAll('.link-delete');
-  deleteLinkBtns.forEach(function(btn) {
+  // 3. 删除链接
+  document.querySelectorAll('.link-delete').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      var groupIndex = parseInt(this.getAttribute('data-group'));
-      var linkIndex = parseInt(this.getAttribute('data-link'));
-      data.groups[groupIndex].links.splice(linkIndex, 1);
-      saveData();
-      renderGroups();
+      e.preventDefault(); e.stopPropagation();
+      data.groups[parseInt(this.getAttribute('data-group'))].links.splice(parseInt(this.getAttribute('data-link')), 1);
+      saveData(); renderGroups();
     });
   });
 
-  // 编辑按钮 - 切换该分组的编辑模式
-  var editGroupBtns = document.querySelectorAll('.edit-group-btn');
-  editGroupBtns.forEach(function(btn) {
+  // 4. 分组编辑模式切换
+  document.querySelectorAll('.edit-group-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       var index = parseInt(this.getAttribute('data-index'));
-      
-      if (editingGroupIndex === index) {
-        // 退出编辑模式
-        editingGroupIndex = null;
-        isEditMode = false;
-      } else {
-        // 进入该分组的编辑模式
-        editingGroupIndex = index;
-        isEditMode = true;
-      }
-      
+      if (editingGroupIndex === index) { editingGroupIndex = null; isEditMode = false; }
+      else { editingGroupIndex = index; isEditMode = true; }
       renderGroups();
     });
   });
 
-  // 分组编辑图标 - 修改分组名称
-  var groupEditIcons = document.querySelectorAll('.group-edit-icon');
-  groupEditIcons.forEach(function(icon) {
+  // 5. 编辑分组名
+  document.querySelectorAll('.group-edit-icon').forEach(function(icon) {
     icon.addEventListener('click', function(e) {
       e.stopPropagation();
-      var index = parseInt(this.getAttribute('data-index'));
-      openEditGroupModal(index);
+      openEditGroupModal(parseInt(this.getAttribute('data-index')));
     });
   });
 
-  // 删除分组
-  var deleteGroupBtns = document.querySelectorAll('.delete-group-btn');
-  deleteGroupBtns.forEach(function(btn) {
+  // 6. 删除分组
+  document.querySelectorAll('.delete-group-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       var index = parseInt(this.getAttribute('data-index'));
-      if (confirm('确定删除分组 "' + data.groups[index].name + '" 及其所有链接？')) {
+      if (confirm('确定删除分组 "' + data.groups[index].name + '"?')) {
         data.groups.splice(index, 1);
-        editingGroupIndex = null;
-        isEditMode = false;
-        saveData();
-        renderGroups();
+        editingGroupIndex = null; isEditMode = false;
+        saveData(); renderGroups();
       }
     });
   });
 
-  // 设置当前编辑分组的样式和拖拽
+  // 7. 拖拽排序逻辑
   if (editingGroupIndex !== null) {
     var editingSection = document.querySelector('.group-section[data-group-index="' + editingGroupIndex + '"]');
     if (editingSection) {
@@ -414,315 +417,68 @@ function bindEvents() {
   }
 }
 
-// 打开编辑分组弹窗
-function openEditGroupModal(index) {
-  currentGroupIndex = index;
-  var group = data.groups[index];
-  document.getElementById('groupName').value = group.name;
-  document.getElementById('groupIcon').value = group.icon;
-  document.getElementById('groupModalTitle').textContent = '编辑分组';
-  document.getElementById('groupModal').classList.add('active');
-}
+// 占位函数：拖拽与预览 (保持原有逻辑，太长不重复展示，请保留你原代码中的这些函数)
+function setupDragAndDrop(groupIndex) { /* ...保留原代码... */ var linksRow = document.querySelector('.links-row[data-group-index="' + groupIndex + '"]'); if (!linksRow) return; var linkCards = linksRow.querySelectorAll('.link-card'); linkCards.forEach(function(card) { card.setAttribute('draggable', 'true'); card.addEventListener('click', function(e) { if (editingGroupIndex !== null) { e.preventDefault(); } }); card.addEventListener('dragstart', function(e) { if (editingGroupIndex === null) { e.preventDefault(); return; } this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', JSON.stringify({ groupIndex: this.getAttribute('data-group'), linkIndex: this.getAttribute('data-link') })); }); card.addEventListener('dragend', function() { this.classList.remove('dragging'); document.querySelectorAll('.link-card').forEach(function(c) { c.classList.remove('drag-over'); }); }); card.addEventListener('dragover', function(e) { if (editingGroupIndex === null) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; this.classList.add('drag-over'); }); card.addEventListener('dragleave', function() { this.classList.remove('drag-over'); }); card.addEventListener('drop', function(e) { if (editingGroupIndex === null) return; e.preventDefault(); this.classList.remove('drag-over'); var sourceData = JSON.parse(e.dataTransfer.getData('text/plain')); var targetGroupIndex = parseInt(this.getAttribute('data-group')); var targetLinkIndex = parseInt(this.getAttribute('data-link')); var sourceGroupIndex = parseInt(sourceData.groupIndex); var sourceLinkIndex = parseInt(sourceData.linkIndex); if (sourceGroupIndex === targetGroupIndex && sourceLinkIndex === targetLinkIndex) { return; } if (sourceGroupIndex === targetGroupIndex) { var links = data.groups[sourceGroupIndex].links; var movedLink = links.splice(sourceLinkIndex, 1)[0]; links.splice(targetLinkIndex, 0, movedLink); saveData(); renderGroups(); } }); }); }
+function setupGroupDragAndDrop() { /* ...保留原代码... */ var groupSections = document.querySelectorAll('.group-section'); groupSections.forEach(function(section) { var header = section.querySelector('.group-header'); section.setAttribute('draggable', 'true'); section.addEventListener('dragstart', function(e) { if (editingGroupIndex === null) { e.preventDefault(); return; } if (!e.target.classList.contains('group-section')) return; this.classList.add('dragging-group'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/group', this.getAttribute('data-group-index')); }); section.addEventListener('dragend', function() { this.classList.remove('dragging-group'); document.querySelectorAll('.group-section').forEach(function(s) { s.classList.remove('drag-over-group'); }); }); section.addEventListener('dragover', function(e) { if (editingGroupIndex === null) return; if (e.dataTransfer.types.includes('application/group')) { e.preventDefault(); this.classList.add('drag-over-group'); } }); section.addEventListener('dragleave', function() { this.classList.remove('drag-over-group'); }); section.addEventListener('drop', function(e) { if (editingGroupIndex === null) return; if (!e.dataTransfer.types.includes('application/group')) return; e.preventDefault(); this.classList.remove('drag-over-group'); var sourceIndex = parseInt(e.dataTransfer.getData('application/group')); var targetIndex = parseInt(this.getAttribute('data-group-index')); if (sourceIndex === targetIndex) return; var movedGroup = data.groups.splice(sourceIndex, 1)[0]; data.groups.splice(targetIndex, 0, movedGroup); if (editingGroupIndex === sourceIndex) { editingGroupIndex = targetIndex; } else if (sourceIndex < editingGroupIndex && targetIndex >= editingGroupIndex) { editingGroupIndex--; } else if (sourceIndex > editingGroupIndex && targetIndex <= editingGroupIndex) { editingGroupIndex++; } saveData(); renderGroups(); }); }); }
+function setupUrlPreview(id1, id2, id3, id4) { /* ...保留原代码... */ var urlInput = document.getElementById(id1); var timer; urlInput.addEventListener('input', function() { clearTimeout(timer); var url = this.value.trim(); timer = setTimeout(function() { if (url && (url.startsWith('http') || url.includes('.'))) { if (!url.startsWith('http')) url = 'https://' + url; var iconUrl = getIconUrl(url); var domain = getDomainName(url); if (iconUrl) { document.getElementById(id3).src = iconUrl; document.getElementById(id4).textContent = domain; document.getElementById(id2).style.display = 'flex'; } } else { document.getElementById(id2).style.display = 'none'; } }, 300); }); }
 
-// 拖拽排序 - 只对指定分组内的链接生效
-function setupDragAndDrop(groupIndex) {
-  var linksRow = document.querySelector('.links-row[data-group-index="' + groupIndex + '"]');
-  if (!linksRow) return;
+// Modal 相关函数
+function openLinkModal() { currentLinkIndex = null; document.getElementById('linkUrl').value = ''; document.getElementById('linkName').value = ''; document.getElementById('linkPreview').style.display = 'none'; document.getElementById('linkModalTitle').textContent = '添加链接'; customIconBase64 = null; document.getElementById('customIconStatus').textContent = '未选择'; document.getElementById('customIconPreview').style.display = 'none'; document.getElementById('linkModal').classList.add('active'); document.getElementById('linkUrl').focus(); }
+function openEditLinkModal(gIdx, lIdx) { currentGroupIndex = gIdx; currentLinkIndex = lIdx; var link = data.groups[gIdx].links[lIdx]; document.getElementById('linkUrl').value = link.url; document.getElementById('linkName').value = link.name; document.getElementById('linkModalTitle').textContent = '编辑链接'; var iconUrl = link.customIcon || getIconUrl(link.url); if (iconUrl) { document.getElementById('linkPreviewIcon').src = iconUrl; document.getElementById('linkPreviewDomain').textContent = getDomainName(link.url); document.getElementById('linkPreview').style.display = 'flex'; } if (link.customIcon) { customIconBase64 = link.customIcon; document.getElementById('customIconStatus').textContent = '已设置'; document.getElementById('customIconImg').src = link.customIcon; document.getElementById('customIconPreview').style.display = 'block'; } else { customIconBase64 = null; document.getElementById('customIconStatus').textContent = '未选择'; document.getElementById('customIconPreview').style.display = 'none'; } document.getElementById('linkModal').classList.add('active'); }
+function closeLinkModal() { document.getElementById('linkModal').classList.remove('active'); currentGroupIndex = null; }
+function saveLink() { var url = document.getElementById('linkUrl').value.trim(); var name = document.getElementById('linkName').value.trim(); if (!url) return; if (!url.startsWith('http')) url = 'https://' + url; if (!name) name = getDomainName(url); if (currentLinkIndex !== null) { var l = data.groups[currentGroupIndex].links[currentLinkIndex]; l.name = name; l.url = url; if (customIconBase64) l.customIcon = customIconBase64; else delete l.customIcon; } else { var nl = {name:name, url:url}; if (customIconBase64) nl.customIcon = customIconBase64; data.groups[currentGroupIndex].links.push(nl); } saveData(); render(); closeLinkModal(); }
+function openGroupModal() { currentGroupIndex = null; document.getElementById('groupName').value = ''; document.getElementById('groupIcon').value = ''; document.getElementById('groupModalTitle').textContent = '添加分组'; document.getElementById('groupModal').classList.add('active'); document.getElementById('groupName').focus(); }
+function closeGroupModal() { document.getElementById('groupModal').classList.remove('active'); }
+function saveGroup() { var name = document.getElementById('groupName').value.trim(); var icon = document.getElementById('groupIcon').value.trim() || '📁'; if (!name) return; if (currentGroupIndex !== null) { data.groups[currentGroupIndex].name = name; data.groups[currentGroupIndex].icon = icon; } else { data.groups.push({name:name, icon:icon, links:[]}); } saveData(); render(); closeGroupModal(); }
+function doSearch() { var q = document.getElementById('searchInput').value.trim(); if (!q) return; window.location.href = searchEngines[data.searchEngine].url + encodeURIComponent(q); }
+
+// WebDAV 设置保存 (修改 data.webdav)
+function saveWebdavConfig() {
+  data.webdav.url = document.getElementById('webdavUrl').value.trim();
+  data.webdav.user = document.getElementById('webdavUser').value.trim();
+  data.webdav.pass = document.getElementById('webdavPass').value;
   
-  var linkCards = linksRow.querySelectorAll('.link-card');
-  
-  linkCards.forEach(function(card) {
-    card.setAttribute('draggable', 'true');
-    
-    card.addEventListener('click', function(e) {
-      if (editingGroupIndex !== null) {
-        e.preventDefault();
-      }
-    });
-    
-    card.addEventListener('dragstart', function(e) {
-      if (editingGroupIndex === null) {
-        e.preventDefault();
-        return;
-      }
-      this.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', JSON.stringify({
-        groupIndex: this.getAttribute('data-group'),
-        linkIndex: this.getAttribute('data-link')
-      }));
-    });
-    
-    card.addEventListener('dragend', function() {
-      this.classList.remove('dragging');
-      document.querySelectorAll('.link-card').forEach(function(c) {
-        c.classList.remove('drag-over');
-      });
-    });
-    
-    card.addEventListener('dragover', function(e) {
-      if (editingGroupIndex === null) return;
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      this.classList.add('drag-over');
-    });
-    
-    card.addEventListener('dragleave', function() {
-      this.classList.remove('drag-over');
-    });
-    
-    card.addEventListener('drop', function(e) {
-      if (editingGroupIndex === null) return;
-      e.preventDefault();
-      this.classList.remove('drag-over');
-      
-      var sourceData = JSON.parse(e.dataTransfer.getData('text/plain'));
-      var targetGroupIndex = parseInt(this.getAttribute('data-group'));
-      var targetLinkIndex = parseInt(this.getAttribute('data-link'));
-      var sourceGroupIndex = parseInt(sourceData.groupIndex);
-      var sourceLinkIndex = parseInt(sourceData.linkIndex);
-      
-      if (sourceGroupIndex === targetGroupIndex && sourceLinkIndex === targetLinkIndex) {
-        return;
-      }
-      
-      // 只允许同分组内排序
-      if (sourceGroupIndex === targetGroupIndex) {
-        var links = data.groups[sourceGroupIndex].links;
-        var movedLink = links.splice(sourceLinkIndex, 1)[0];
-        links.splice(targetLinkIndex, 0, movedLink);
-        saveData();
-        renderGroups();
-      }
-    });
-  });
-}
-
-// 分组拖拽排序
-function setupGroupDragAndDrop() {
-  var groupSections = document.querySelectorAll('.group-section');
-  
-  groupSections.forEach(function(section) {
-    var header = section.querySelector('.group-header');
-    
-    section.setAttribute('draggable', 'true');
-    
-    section.addEventListener('dragstart', function(e) {
-      if (editingGroupIndex === null) {
-        e.preventDefault();
-        return;
-      }
-      // 只有拖动 header 区域才能拖动分组
-      if (!e.target.classList.contains('group-section')) return;
-      this.classList.add('dragging-group');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('application/group', this.getAttribute('data-group-index'));
-    });
-    
-    section.addEventListener('dragend', function() {
-      this.classList.remove('dragging-group');
-      document.querySelectorAll('.group-section').forEach(function(s) {
-        s.classList.remove('drag-over-group');
-      });
-    });
-    
-    section.addEventListener('dragover', function(e) {
-      if (editingGroupIndex === null) return;
-      if (e.dataTransfer.types.includes('application/group')) {
-        e.preventDefault();
-        this.classList.add('drag-over-group');
-      }
-    });
-    
-    section.addEventListener('dragleave', function() {
-      this.classList.remove('drag-over-group');
-    });
-    
-    section.addEventListener('drop', function(e) {
-      if (editingGroupIndex === null) return;
-      if (!e.dataTransfer.types.includes('application/group')) return;
-      
-      e.preventDefault();
-      this.classList.remove('drag-over-group');
-      
-      var sourceIndex = parseInt(e.dataTransfer.getData('application/group'));
-      var targetIndex = parseInt(this.getAttribute('data-group-index'));
-      
-      if (sourceIndex === targetIndex) return;
-      
-      var movedGroup = data.groups.splice(sourceIndex, 1)[0];
-      data.groups.splice(targetIndex, 0, movedGroup);
-      
-      // 更新 editingGroupIndex
-      if (editingGroupIndex === sourceIndex) {
-        editingGroupIndex = targetIndex;
-      } else if (sourceIndex < editingGroupIndex && targetIndex >= editingGroupIndex) {
-        editingGroupIndex--;
-      } else if (sourceIndex > editingGroupIndex && targetIndex <= editingGroupIndex) {
-        editingGroupIndex++;
-      }
-      
-      saveData();
-      renderGroups();
-    });
-  });
-}
-
-// URL 输入预览
-function setupUrlPreview(urlInputId, previewContainerId, previewIconId, previewDomainId) {
-  var urlInput = document.getElementById(urlInputId);
-  
-  urlInput.addEventListener('input', function() {
-    clearTimeout(urlInputTimer);
-    var url = this.value.trim();
-    
-    urlInputTimer = setTimeout(function() {
-      if (url && (url.startsWith('http') || url.includes('.'))) {
-        if (!url.startsWith('http')) {
-          url = 'https://' + url;
-        }
-        
-        var iconUrl = getIconUrl(url);
-        var domain = getDomainName(url);
-        
-        if (iconUrl) {
-          document.getElementById(previewIconId).src = iconUrl;
-          document.getElementById(previewDomainId).textContent = domain;
-          document.getElementById(previewContainerId).style.display = 'flex';
-        }
-      } else {
-        document.getElementById(previewContainerId).style.display = 'none';
-      }
-    }, 300);
-  });
-}
-
-// 链接弹窗
-function openLinkModal() {
-  currentLinkIndex = null;
-  document.getElementById('linkUrl').value = '';
-  document.getElementById('linkName').value = '';
-  document.getElementById('linkPreview').style.display = 'none';
-  document.getElementById('linkModalTitle').textContent = '添加链接';
-  // 重置自定义图标
-  customIconBase64 = null;
-  document.getElementById('customIconStatus').textContent = '未选择';
-  document.getElementById('customIconPreview').style.display = 'none';
-  document.getElementById('linkModal').classList.add('active');
-  document.getElementById('linkUrl').focus();
-}
-
-// 打开编辑链接弹窗
-function openEditLinkModal(groupIndex, linkIndex) {
-  currentGroupIndex = groupIndex;
-  currentLinkIndex = linkIndex;
-  var link = data.groups[groupIndex].links[linkIndex];
-  
-  document.getElementById('linkUrl').value = link.url;
-  document.getElementById('linkName').value = link.name;
-  document.getElementById('linkModalTitle').textContent = '编辑链接';
-  
-  // 显示图标预览
-  var iconUrl = link.customIcon || getIconUrl(link.url);
-  if (iconUrl) {
-    document.getElementById('linkPreviewIcon').src = iconUrl;
-    document.getElementById('linkPreviewDomain').textContent = getDomainName(link.url);
-    document.getElementById('linkPreview').style.display = 'flex';
-  }
-  
-  // 自定义图标状态
-  if (link.customIcon) {
-    customIconBase64 = link.customIcon;
-    document.getElementById('customIconStatus').textContent = '已设置';
-    document.getElementById('customIconImg').src = link.customIcon;
-    document.getElementById('customIconPreview').style.display = 'block';
-  } else {
-    customIconBase64 = null;
-    document.getElementById('customIconStatus').textContent = '未选择';
-    document.getElementById('customIconPreview').style.display = 'none';
-  }
-  
-  document.getElementById('linkModal').classList.add('active');
-}
-
-function closeLinkModal() {
-  document.getElementById('linkModal').classList.remove('active');
-  currentGroupIndex = null;
-}
-
-function saveLink() {
-  var url = document.getElementById('linkUrl').value.trim();
-  var name = document.getElementById('linkName').value.trim();
-
-  if (!url) return;
-  if (!url.startsWith('http')) url = 'https://' + url;
-  if (!name) name = getDomainName(url);
-
-  if (currentLinkIndex !== null && data.groups[currentGroupIndex].links[currentLinkIndex]) {
-    // 编辑现有链接
-    data.groups[currentGroupIndex].links[currentLinkIndex].name = name;
-    data.groups[currentGroupIndex].links[currentLinkIndex].url = url;
-    if (customIconBase64) {
-      data.groups[currentGroupIndex].links[currentLinkIndex].customIcon = customIconBase64;
-    } else {
-      delete data.groups[currentGroupIndex].links[currentLinkIndex].customIcon;
-    }
-  } else {
-    // 添加新链接
-    var newLink = { name: name, url: url };
-    if (customIconBase64) {
-      newLink.customIcon = customIconBase64;
-    }
-    data.groups[currentGroupIndex].links.push(newLink);
-  }
-
+  showWebdavStatus('配置已更新，正在同步...', 'info');
+  // 触发保存，保存会触发 autoSync
   saveData();
-  render();
-  closeLinkModal();
 }
 
-// 分组弹窗
-function openGroupModal() {
-  currentGroupIndex = null;
-  document.getElementById('groupName').value = '';
-  document.getElementById('groupIcon').value = '';
-  document.getElementById('groupModalTitle').textContent = '添加分组';
-  document.getElementById('groupModal').classList.add('active');
-  document.getElementById('groupName').focus();
+function showWebdavStatus(msg, type) {
+  var el = document.getElementById('webdavStatus');
+  el.textContent = msg;
+  el.style.color = type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : 'var(--text-muted)';
 }
 
-function closeGroupModal() {
-  document.getElementById('groupModal').classList.remove('active');
+// 按钮功能绑定 (上传下载复用 autoSync 和 checkCloudSync 的逻辑，但提供手动反馈)
+function webdavUpload() {
+  var cfg = data.webdav;
+  if (!cfg.url) { showWebdavStatus('请先保存 WebDAV 设置', 'error'); return; }
+  showWebdavStatus('上传中...', 'info');
+  autoSyncToWebdav(); // 复用自动同步
 }
 
-function saveGroup() {
-  var name = document.getElementById('groupName').value.trim();
-  var icon = document.getElementById('groupIcon').value.trim() || '📁';
-
-  if (!name) return;
-
-  if (currentGroupIndex !== null && data.groups[currentGroupIndex]) {
-    // 编辑现有分组
-    data.groups[currentGroupIndex].name = name;
-    data.groups[currentGroupIndex].icon = icon;
-  } else {
-    // 添加新分组
-    data.groups.push({ name: name, icon: icon, links: [] });
-  }
-  
-  saveData();
-  render();
-  closeGroupModal();
+function webdavDownload() {
+  var cfg = data.webdav;
+  if (!cfg.url) { showWebdavStatus('请先保存 WebDAV 设置', 'error'); return; }
+  showWebdavStatus('下载中...', 'info');
+  // 手动调用下载逻辑
+  var fileUrl = cfg.url.replace(/\/$/, '') + '/newtab-config.json';
+  fetch(fileUrl, {
+    method: 'GET',
+    headers: { 'Authorization': 'Basic ' + btoa(cfg.user + ':' + cfg.pass) }
+  }).then(r => { if(!r.ok) throw new Error(r.status); return r.json(); })
+    .then(d => {
+       if(d.groups) { 
+         // 保护本地 webdav 配置不被覆盖（如果云端为空）
+         if(!d.webdav && data.webdav) d.webdav = data.webdav;
+         initData(d); 
+         saveData(); 
+         showWebdavStatus('下载成功 ✓', 'success'); 
+       }
+    }).catch(e => showWebdavStatus('失败: ' + e.message, 'error'));
 }
 
-// 搜索
-function doSearch() {
-  var query = document.getElementById('searchInput').value.trim();
-  if (!query) return;
-  window.location.href = searchEngines[data.searchEngine].url + encodeURIComponent(query);
-}
-
-// 导出导入
+// 导入导出
 function exportData() {
   var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   var url = URL.createObjectURL(blob);
@@ -733,135 +489,41 @@ function exportData() {
   URL.revokeObjectURL(url);
 }
 
-function importData() {
-  document.getElementById('importFile').click();
-}
-
+function importData() { document.getElementById('importFile').click(); }
 function handleImport(e) {
   var file = e.target.files[0];
   if (!file) return;
-
   var reader = new FileReader();
   reader.onload = function(e) {
     try {
       var imported = JSON.parse(e.target.result);
       if (imported.groups) {
-        data = imported;
+        initData(imported);
         saveData();
-        render();
         alert('导入成功');
       }
-    } catch (err) {
-      alert('导入失败');
-    }
+    } catch (err) { alert('导入失败'); }
   };
   reader.readAsText(file);
 }
 
-// WebDAV 配置
-var webdavConfig = {
-  url: '',
-  user: '',
-  pass: ''
-};
-
-function loadWebdavConfig() {
-  var saved = localStorage.getItem('webdavConfig');
-  if (saved) {
-    webdavConfig = JSON.parse(saved);
-  }
-}
-
-function saveWebdavConfig() {
-  webdavConfig.url = document.getElementById('webdavUrl').value.trim();
-  webdavConfig.user = document.getElementById('webdavUser').value.trim();
-  webdavConfig.pass = document.getElementById('webdavPass').value;
-  localStorage.setItem('webdavConfig', JSON.stringify(webdavConfig));
-  showWebdavStatus('配置已保存', 'success');
-}
-
-function showWebdavStatus(msg, type) {
-  var el = document.getElementById('webdavStatus');
-  el.textContent = msg;
-  el.style.color = type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : 'var(--text-muted)';
-}
-
-// WebDAV 上传
-function webdavUpload() {
-  if (!webdavConfig.url) {
-    showWebdavStatus('请先配置 WebDAV 地址', 'error');
-    return;
-  }
-
-  showWebdavStatus('正在上传...', 'info');
-
-  var fileUrl = webdavConfig.url.replace(/\/$/, '') + '/newtab-config.json';
-  
-  fetch(fileUrl, {
-    method: 'PUT',
-    headers: {
-      'Authorization': 'Basic ' + btoa(webdavConfig.user + ':' + webdavConfig.pass),
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(data, null, 2)
-  })
-  .then(function(response) {
-    if (response.ok || response.status === 201 || response.status === 204) {
-      showWebdavStatus('上传成功 ✓', 'success');
-    } else {
-      throw new Error('HTTP ' + response.status);
-    }
-  })
-  .catch(function(err) {
-    showWebdavStatus('上传失败: ' + err.message, 'error');
-  });
-}
-
-// WebDAV 下载
-function webdavDownload() {
-  if (!webdavConfig.url) {
-    showWebdavStatus('请先配置 WebDAV 地址', 'error');
-    return;
-  }
-
-  showWebdavStatus('正在下载...', 'info');
-
-  var fileUrl = webdavConfig.url.replace(/\/$/, '') + '/newtab-config.json';
-
-  fetch(fileUrl, {
-    method: 'GET',
-    headers: {
-      'Authorization': 'Basic ' + btoa(webdavConfig.user + ':' + webdavConfig.pass)
-    }
-  })
-  .then(function(response) {
-    if (!response.ok) {
-      throw new Error('HTTP ' + response.status);
-    }
-    return response.json();
-  })
-  .then(function(remoteData) {
-    if (remoteData.groups) {
-      data = remoteData;
-      saveData();
-      render();
-      showWebdavStatus('下载成功 ✓', 'success');
-    } else {
-      throw new Error('无效的配置文件');
-    }
-  })
-  .catch(function(err) {
-    showWebdavStatus('下载失败: ' + err.message, 'error');
-  });
-}
-
-// 初始化
+// --- 初始化 ---
 document.addEventListener('DOMContentLoaded', function() {
   setupUrlPreview('linkUrl', 'linkPreview', 'linkPreviewIcon', 'linkPreviewDomain');
 
+  // 基础按钮
+  document.getElementById('searchBtn').addEventListener('click', doSearch);
+  document.getElementById('searchInput').addEventListener('keypress', function(e) { if (e.key === 'Enter') doSearch(); });
+  document.getElementById('addGroupBtn').addEventListener('click', openGroupModal);
+  document.getElementById('closeGroupModal').addEventListener('click', closeGroupModal);
+  document.getElementById('saveGroupBtn').addEventListener('click', saveGroup);
+  document.getElementById('cancelGroupBtn').addEventListener('click', closeGroupModal);
+  document.getElementById('closeLinkModal').addEventListener('click', closeLinkModal);
+  document.getElementById('saveLinkBtn').addEventListener('click', saveLink);
+  document.getElementById('cancelLinkBtn').addEventListener('click', closeLinkModal);
+
   // 搜索引擎切换
-  var engines = document.querySelectorAll('.search-engine');
-  engines.forEach(function(el) {
+  document.querySelectorAll('.search-engine').forEach(function(el) {
     el.addEventListener('click', function() {
       data.searchEngine = this.getAttribute('data-engine');
       saveData();
@@ -869,41 +531,28 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
-  // 搜索
-  document.getElementById('searchBtn').addEventListener('click', doSearch);
-  document.getElementById('searchInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') doSearch();
-  });
-
-  // 添加分组
-  document.getElementById('addGroupBtn').addEventListener('click', openGroupModal);
-  document.getElementById('closeGroupModal').addEventListener('click', closeGroupModal);
-  document.getElementById('saveGroupBtn').addEventListener('click', saveGroup);
-  document.getElementById('cancelGroupBtn').addEventListener('click', closeGroupModal);
-
-  // 添加链接
-  document.getElementById('closeLinkModal').addEventListener('click', closeLinkModal);
-  document.getElementById('saveLinkBtn').addEventListener('click', saveLink);
-  document.getElementById('cancelLinkBtn').addEventListener('click', closeLinkModal);
-
-  // 设置
+  // 设置菜单：打开时回填所有数据 (外观 + WebDAV)
   document.getElementById('settingsBtn').addEventListener('click', function() {
     document.getElementById('bgUrl').value = data.bgUrl || '';
-    // 加载透明度设置
-    var opacityLight = localStorage.getItem('opacityLight') || 85;
-    var opacityDark = localStorage.getItem('opacityDark') || 85;
-    document.getElementById('opacityLight').value = opacityLight;
-    document.getElementById('opacityDark').value = opacityDark;
-    document.getElementById('opacityLightVal').textContent = opacityLight + '%';
-    document.getElementById('opacityDarkVal').textContent = opacityDark + '%';
-    // 加载 WebDAV 配置
-    loadWebdavConfig();
-    document.getElementById('webdavUrl').value = webdavConfig.url || '';
-    document.getElementById('webdavUser').value = webdavConfig.user || '';
-    document.getElementById('webdavPass').value = webdavConfig.pass || '';
+    
+    // 外观回填
+    var opL = data.opacityLight || 85;
+    var opD = data.opacityDark || 85;
+    document.getElementById('opacityLight').value = opL;
+    document.getElementById('opacityDark').value = opD;
+    document.getElementById('opacityLightVal').textContent = opL + '%';
+    document.getElementById('opacityDarkVal').textContent = opD + '%';
+
+    // WebDAV 回填 (直接从 data 读取)
+    var wd = data.webdav || {url:'', user:'', pass:''};
+    document.getElementById('webdavUrl').value = wd.url || '';
+    document.getElementById('webdavUser').value = wd.user || '';
+    document.getElementById('webdavPass').value = wd.pass || '';
     document.getElementById('webdavStatus').textContent = '';
+    
     document.getElementById('settingsModal').classList.add('active');
   });
+
   document.getElementById('closeSettingsModal').addEventListener('click', function() {
     document.getElementById('settingsModal').classList.remove('active');
   });
@@ -915,95 +564,55 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('settingsModal').classList.remove('active');
   });
 
-  // 透明度滑块实时预览
+  // 透明度滑块
   document.getElementById('opacityLight').addEventListener('input', function() {
-    document.getElementById('opacityLightVal').textContent = this.value + '%';
-    document.documentElement.style.setProperty('--opacity-light', this.value / 100);
+    var val = parseInt(this.value);
+    document.getElementById('opacityLightVal').textContent = val + '%';
+    document.documentElement.style.setProperty('--opacity-light', val / 100);
   });
-
   document.getElementById('opacityDark').addEventListener('input', function() {
-    document.getElementById('opacityDarkVal').textContent = this.value + '%';
-    document.documentElement.style.setProperty('--opacity-dark', this.value / 100);
+    var val = parseInt(this.value);
+    document.getElementById('opacityDarkVal').textContent = val + '%';
+    document.documentElement.style.setProperty('--opacity-dark', val / 100);
   });
-
-  // 保存透明度
   document.getElementById('saveOpacityBtn').addEventListener('click', function() {
-    var opacityLight = document.getElementById('opacityLight').value;
-    var opacityDark = document.getElementById('opacityDark').value;
-    localStorage.setItem('opacityLight', opacityLight);
-    localStorage.setItem('opacityDark', opacityDark);
-    document.documentElement.style.setProperty('--opacity-light', opacityLight / 100);
-    document.documentElement.style.setProperty('--opacity-dark', opacityDark / 100);
+    data.opacityLight = parseInt(document.getElementById('opacityLight').value);
+    data.opacityDark = parseInt(document.getElementById('opacityDark').value);
+    saveData(); 
   });
 
   // 图标上传
-  document.getElementById('uploadIconBtn').addEventListener('click', function() {
-    document.getElementById('iconFileInput').click();
-  });
+  document.getElementById('uploadIconBtn').addEventListener('click', function() { document.getElementById('iconFileInput').click(); });
+  document.getElementById('iconFileInput').addEventListener('change', function(e) { var file = e.target.files[0]; if (!file) return; if (file.size > 50 * 1024) { alert('图标需<50KB'); return; } var reader = new FileReader(); reader.onload = function(e) { customIconBase64 = e.target.result; document.getElementById('customIconStatus').textContent = '已选择'; document.getElementById('customIconImg').src = customIconBase64; document.getElementById('customIconPreview').style.display = 'block'; }; reader.readAsDataURL(file); });
 
-  document.getElementById('iconFileInput').addEventListener('change', function(e) {
-    var file = e.target.files[0];
-    if (!file) return;
-
-    // 检查文件大小（限制 50KB）
-    if (file.size > 50 * 1024) {
-      alert('图标太大，请选择小于 50KB 的图片');
-      return;
-    }
-
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      customIconBase64 = e.target.result;
-      document.getElementById('customIconStatus').textContent = '已选择';
-      document.getElementById('customIconImg').src = customIconBase64;
-      document.getElementById('customIconPreview').style.display = 'block';
-    };
-    reader.readAsDataURL(file);
-  });
-
+  // WebDAV 按钮事件
+  document.getElementById('webdavSaveConfig').addEventListener('click', saveWebdavConfig);
+  document.getElementById('webdavUpload').addEventListener('click', webdavUpload);
+  document.getElementById('webdavDownload').addEventListener('click', webdavDownload);
+  
+  // 导入导出
   document.getElementById('exportBtn').addEventListener('click', exportData);
   document.getElementById('importBtn').addEventListener('click', importData);
   document.getElementById('importFile').addEventListener('change', handleImport);
 
-  // WebDAV
-  document.getElementById('webdavSaveConfig').addEventListener('click', saveWebdavConfig);
-  document.getElementById('webdavUpload').addEventListener('click', webdavUpload);
-  document.getElementById('webdavDownload').addEventListener('click', webdavDownload);
-
-  // 同步提示
+  // 同步弹窗按钮
   document.getElementById('syncApplyRemote').addEventListener('click', applyRemoteData);
   document.getElementById('syncKeepLocal').addEventListener('click', keepLocalData);
 
-  // 暗黑模式切换
+  // 主题切换
   document.getElementById('themeToggle').addEventListener('click', function() {
-    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-    if (isDark) {
-      document.documentElement.removeAttribute('data-theme');
-      localStorage.setItem('theme', 'light');
-      this.textContent = '🌙';
-    } else {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      localStorage.setItem('theme', 'dark');
-      this.textContent = '☀️';
-    }
+    data.theme = (data.theme === 'dark') ? 'light' : 'dark';
+    applyThemeAndOpacity();
+    saveData();
   });
 
-  // 加载保存的主题
-  var savedTheme = localStorage.getItem('theme');
-  if (savedTheme === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-    document.getElementById('themeToggle').textContent = '☀️';
-  }
-
-  // 点击弹窗外部关闭
-  var modals = document.querySelectorAll('.modal');
-  modals.forEach(function(modal) {
+  // Modal 关闭
+  document.querySelectorAll('.modal').forEach(function(modal) {
     modal.addEventListener('click', function(e) {
-      if (e.target === this) {
-        this.classList.remove('active');
-      }
+      if (e.target === this) this.classList.remove('active');
     });
   });
 
+  // 启动
   loadData();
 });
