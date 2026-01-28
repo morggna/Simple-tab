@@ -103,12 +103,15 @@ function saveData() {
   autoSyncToWebdav();
 }
 
-// 自动同步到 WebDAV（静默）
+// 【修改】自动同步到 WebDAV（带轻微视觉反馈）
 function autoSyncToWebdav() {
   loadWebdavConfig();
   if (!webdavConfig.url || !webdavConfig.user) return;
   
   var fileUrl = webdavConfig.url.replace(/\/$/, '') + '/newtab-config.json';
+  
+  // 获取设置按钮用于反馈
+  var settingsBtn = document.getElementById('settingsBtn');
   
   fetch(fileUrl, {
     method: 'PUT',
@@ -117,8 +120,27 @@ function autoSyncToWebdav() {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(data, null, 2)
-  }).catch(function() {
-    // 静默失败，不打扰用户
+  })
+  .then(function(response) {
+    // 200 OK, 201 Created, 204 No Content 都算成功
+    if (response.ok || response.status === 201 || response.status === 204) {
+      console.log('自动同步成功');
+      // 成功反馈：齿轮变绿 1.5秒
+      if(settingsBtn) {
+        settingsBtn.style.color = '#27ae60';
+        setTimeout(function() { settingsBtn.style.color = ''; }, 1500);
+      }
+    } else {
+        throw new Error('HTTP ' + response.status);
+    }
+  })
+  .catch(function(err) {
+    console.error('自动同步失败', err);
+    // 失败反馈：齿轮变红 3秒
+    if(settingsBtn) {
+        settingsBtn.style.color = '#e74c3c';
+        setTimeout(function() { settingsBtn.style.color = ''; }, 3000);
+    }
   });
 }
 
@@ -168,7 +190,7 @@ function showSyncPrompt(remoteData) {
 function applyRemoteData() {
   if (window.pendingRemoteData) {
     data = window.pendingRemoteData;
-    // 保存到本地但不触发自动上传
+    // 保存到本地但不触发自动上传 (防止循环)
     if (typeof chrome !== 'undefined' && chrome.storage) {
       chrome.storage.sync.set({ newtabData: data });
     } else {
@@ -180,10 +202,17 @@ function applyRemoteData() {
   document.getElementById('syncModal').classList.remove('active');
 }
 
-// 保留本地数据
+// 【修改】保留本地数据
 function keepLocalData() {
   window.pendingRemoteData = null;
   document.getElementById('syncModal').classList.remove('active');
+  
+  // 关键逻辑修复：
+  // 既然用户选择保留本地，说明本地是最新的，
+  // 必须立即强制上传一次，覆盖云端的旧数据，
+  // 否则下次刷新页面还会检测到不一致并再次弹窗。
+  console.log('用户选择保留本地，正在覆盖云端...');
+  autoSyncToWebdav(); 
 }
 
 // 渲染
