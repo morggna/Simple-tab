@@ -17,7 +17,7 @@
 
 ## 📦 安装
 
-### 方式一：手动安装（开发者模式）
+### 方式：手动安装（开发者模式）
 
 1. 下载本仓库代码（[Download ZIP](https://github.com/YOUR_USERNAME/infinity-tab/archive/refs/heads/main.zip)）
 2. 解压到本地文件夹
@@ -25,10 +25,6 @@
 4. 开启右上角「开发者模式」
 5. 点击「加载已解压的扩展程序」
 6. 选择解压后的文件夹
-
-### 方式二：Chrome 商店（待上架）
-
-暂未上架 Chrome 商店。
 
 ## 🎯 使用说明
 
