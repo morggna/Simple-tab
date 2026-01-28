@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>New Tab</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%236b7280' d='M18.6 6.62c-1.44 0-2.8.56-3.77 1.53L7.8 14.39c-.64.64-1.49.99-2.4.99C3.53 15.38 2 13.87 2 12s1.53-3.38 3.4-3.38c.91 0 1.76.35 2.44 1.03l1.13 1l1.53-1.34L9.22 8.2A5.37 5.37 0 0 0 5.4 6.62C2.42 6.62 0 9.04 0 12s2.42 5.38 5.4 5.38c1.44 0 2.8-.56 3.77-1.53l7.03-6.24c.64-.64 1.49-.99 2.4-.99c1.87 0 3.4 1.51 3.4 3.38s-1.53 3.38-3.4 3.38c-.9 0-1.76-.35-2.44-1.03L15 13.34l-1.5 1.34l1.28 1.12a5.4 5.4 0 0 0 3.82 1.58c2.98 0 5.4-2.42 5.4-5.38s-2.42-5.38-5.4-5.38'/></svg>">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    /* 默认跟随系统主题 */
+    html {
+      background: #e8e4dc;
+    }
+    
+    @media (prefers-color-scheme: dark) {
+      html {
+        background: #1a1a2e;
+      }
+    }
+    
+    :root {
+      --bg-primary: linear-gradient(180deg, #e8e4dc 0%, #f5f1e8 100%);
+      --bg-card: rgba(255, 255, 255, var(--opacity-light, 0.85));
+      --text-primary: #333;
+      --text-secondary: #444;
+      --text-muted: #888;
+      --border-color: #eee;
+      --shadow: rgba(0,0,0,0.06);
+      --accent: #3498db;
+      --opacity-light: 0.85;
+      --opacity-dark: 0.85;
+    }
+
+    [data-theme="dark"] {
+      --bg-primary: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+      --bg-card: rgba(30, 30, 50, var(--opacity-dark, 0.85));
+      --text-primary: #fff;
+      --text-secondary: #e0e0e0;
+      --text-muted: #aaa;
+      --border-color: rgba(255,255,255,0.15);
+      --shadow: rgba(0,0,0,0.3);
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text-primary);
+      padding: 0 80px;
+      padding-top: 9vh;
+    }
+
+    body.has-bg {
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      background-color: #1a1a2e;
+    }
+
+    /* 搜索框 */
+    .search-box {
+      display: flex;
+      align-items: center;
+      background: var(--bg-card);
+      border-radius: 50px;
+      padding: 14px 14px 14px 20px;
+      box-shadow: 0 2px 12px var(--shadow);
+      max-width: 840px;
+      margin: 0 auto 45px;
+    }
+
+    .search-engines {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding-right: 18px;
+      border-right: 1px solid var(--border-color);
+      margin-right: 18px;
+    }
+
+    .search-engine {
+      width: 26px;
+      height: 26px;
+      cursor: pointer;
+      opacity: 0.4;
+      transition: opacity 0.2s;
+      border-radius: 4px;
+    }
+
+    .search-engine:hover,
+    .search-engine.active {
+      opacity: 1;
+    }
+
+    .search-input {
+      flex: 1;
+      border: none;
+      outline: none;
+      font-size: 15px;
+      color: var(--text-primary);
+      background: transparent;
+    }
+
+    .search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .search-btn {
+      width: 48px;
+      height: 48px;
+      background: #3498db;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+
+    .search-btn:hover {
+      background: #2980b9;
+    }
+
+    .search-btn svg {
+      width: 20px;
+      height: 20px;
+      fill: #fff;
+    }
+
+    /* 分组区域 */
+    .group-section {
+      margin-bottom: 28px;
+    }
+
+    .group-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      position: relative;
+    }
+
+    .group-indicator {
+      width: 4px;
+      height: 18px;
+      background: #3498db;
+      border-radius: 2px;
+    }
+
+    .group-icon {
+      font-size: 16px;
+    }
+
+    .group-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .group-edit-icon {
+      background: none;
+      border: none;
+      font-size: 14px;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 2px 6px;
+      margin-left: 4px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: all 0.15s;
+    }
+
+    .group-header:hover .group-edit-icon {
+      opacity: 1;
+    }
+
+    .group-edit-icon:hover {
+      color: var(--accent);
+      background: rgba(52, 152, 219, 0.1);
+    }
+
+    .group-actions {
+      margin-left: auto;
+      display: flex;
+      gap: 6px;
+    }
+
+    .group-section:hover .group-actions {
+      opacity: 1;
+    }
+
+    .group-action-btn {
+      background: rgba(0,0,0,0.05);
+      border: none;
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    [data-theme="dark"] .group-action-btn {
+      background: rgba(255,255,255,0.1);
+    }
+
+    .group-action-btn:hover {
+      background: rgba(0,0,0,0.1);
+      color: var(--text-secondary);
+    }
+
+    [data-theme="dark"] .group-action-btn:hover {
+      background: rgba(255,255,255,0.15);
+    }
+
+    .group-action-btn.editing {
+      background: #3498db;
+      color: #fff;
+    }
+
+    .group-action-btn.editing:hover {
+      background: #2980b9;
+    }
+
+    .delete-group-btn {
+      display: none;
+    }
+
+    .group-section.editing .delete-group-btn {
+      display: block;
+    }
+
+    .group-section.editing .edit-group-btn {
+      background: #3498db;
+      color: #fff;
+    }
+
+    .group-section.editing .edit-group-btn:hover {
+      background: #2980b9;
+    }
+
+    /* 链接列表 - 横向排列 */
+    .links-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .link-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg-card);
+      border-radius: 10px;
+      padding: 12px 20px;
+      text-decoration: none;
+      color: var(--text-primary);
+      min-width: 160px;
+      box-shadow: 0 1px 4px var(--shadow);
+      transition: all 0.15s ease;
+      position: relative;
+    }
+
+    .link-card:hover {
+      box-shadow: 0 4px 12px var(--shadow);
+      transform: translateY(-1px);
+    }
+
+    .link-icon {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .link-icon img {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      object-fit: contain;
+    }
+
+    .link-icon.fallback {
+      background: var(--border-color);
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .link-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    /* 链接编辑图标 */
+    .link-edit-icon {
+      position: absolute;
+      top: 50%;
+      right: 8px;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      font-size: 12px;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: all 0.15s;
+    }
+
+    .link-card:hover .link-edit-icon {
+      opacity: 1;
+    }
+
+    .link-edit-icon:hover {
+      color: var(--accent);
+      background: rgba(52, 152, 219, 0.1);
+    }
+
+    .link-delete {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      width: 18px;
+      height: 18px;
+      background: #e74c3c;
+      border: 2px solid #f5f1e8;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 10px;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+    }
+
+    .group-section.editing .link-delete {
+      display: flex;
+    }
+
+    /* 添加按钮 */
+    .add-link-btn {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: 1.5px dashed #ccc;
+      border-radius: 10px;
+      padding: 12px 24px;
+      min-width: 80px;
+      cursor: pointer;
+      color: #aaa;
+      font-size: 18px;
+      transition: all 0.15s;
+    }
+
+    .group-section.editing .add-link-btn {
+      display: flex;
+    }
+
+    .add-link-btn:hover {
+      border-color: #3498db;
+      color: #3498db;
+    }
+
+    /* 添加分组按钮 */
+    .add-group-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: transparent;
+      border: 1.5px dashed #ccc;
+      border-radius: 8px;
+      padding: 8px 16px;
+      cursor: pointer;
+      color: #999;
+      font-size: 13px;
+      margin-top: 10px;
+    }
+
+    .add-group-btn:hover {
+      border-color: #3498db;
+      color: #3498db;
+    }
+
+    /* 拖拽样式 */
+    .group-section.editing .link-card {
+      cursor: grab;
+    }
+
+    .group-section.editing .link-card:active {
+      cursor: grabbing;
+    }
+
+    .link-card.dragging {
+      opacity: 0.5;
+      transform: scale(1.02);
+    }
+
+    .link-card.drag-over {
+      border: 2px dashed #3498db;
+    }
+
+    /* 分组拖拽样式 */
+    .group-section.dragging-group {
+      opacity: 0.5;
+    }
+
+    .group-section.drag-over-group {
+      border-top: 2px dashed #3498db;
+      padding-top: 10px;
+    }
+
+    /* 设置按钮 */
+    .settings-btn {
+      position: fixed;
+      top: 20px;
+      right: 24px;
+      background: var(--bg-card);
+      border: none;
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      font-size: 16px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 4px var(--shadow);
+    }
+
+    .settings-btn:hover {
+      color: var(--text-secondary);
+    }
+
+    /* 暗黑模式切换 */
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 70px;
+      background: var(--bg-card);
+      border: none;
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      cursor: pointer;
+      font-size: 16px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 4px var(--shadow);
+    }
+
+    .theme-toggle:hover {
+      color: var(--text-secondary);
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.3);
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal.active { display: flex; }
+
+    .modal-content {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 24px;
+      width: 90%;
+      max-width: 400px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    }
+
+    [data-theme="dark"] .modal-content {
+      background: #2a2a3e;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .modal-title {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: var(--text-muted);
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+    }
+
+    .close-btn:hover { 
+      background: var(--border-color);
+      color: var(--text-secondary); 
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 14px;
+      color: var(--text-primary);
+      background: var(--bg-card);
+    }
+
+    [data-theme="dark"] .form-group input,
+    [data-theme="dark"] .form-group select {
+      background: rgba(255,255,255,0.05);
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .form-group input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .icon-preview {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #f9f9f9;
+      border-radius: 8px;
+      margin-top: 8px;
+    }
+
+    .icon-preview img {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      object-fit: contain;
+    }
+
+    .icon-preview span {
+      font-size: 13px;
+      color: #666;
+    }
+
+    .btn {
+      padding: 11px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-primary {
+      background: #3498db;
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: #2980b9;
+    }
+
+    .btn-secondary {
+      background: #f0f0f0;
+      color: #555;
+    }
+
+    .btn-secondary:hover {
+      background: #e5e5e5;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .btn-group .btn {
+      flex: 1;
+    }
+
+    .settings-section {
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .settings-section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .settings-section-title {
+      font-size: 11px;
+      color: #999;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .settings-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+  <button class="theme-toggle" id="themeToggle" title="切换暗黑模式">🌙</button>
+  <button class="settings-btn" id="settingsBtn">⚙️</button>
+
+  <!-- 搜索框 -->
+  <div class="search-box">
+    <div class="search-engines">
+      <img class="search-engine active" data-engine="google" src="https://www.google.com/favicon.ico" alt="Google" title="Google">
+      <img class="search-engine" data-engine="bing" src="https://www.bing.com/favicon.ico" alt="Bing" title="Bing">
+      <img class="search-engine" data-engine="baidu" src="https://www.baidu.com/favicon.ico" alt="百度" title="百度">
+    </div>
+    <input type="text" class="search-input" id="searchInput" placeholder="使用 Google 搜索..." autocomplete="off">
+    <button class="search-btn" id="searchBtn">
+      <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+    </button>
+  </div>
+
+  <!-- 分组容器 -->
+  <div id="groupsContainer"></div>
+
+  <!-- 添加分组按钮 -->
+  <button class="add-group-btn" id="addGroupBtn">+ 添加分组</button>
+
+  <!-- 添加链接弹窗 -->
+  <div class="modal" id="linkModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title" id="linkModalTitle">添加链接</span>
+        <button class="close-btn" id="closeLinkModal">&times;</button>
+      </div>
+      <div class="form-group">
+        <label>网址</label>
+        <input type="text" id="linkUrl" placeholder="https://github.com">
+        <div class="icon-preview" id="linkPreview" style="display:none;">
+          <img id="linkPreviewIcon" src="">
+          <span id="linkPreviewDomain"></span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>名称 (可选)</label>
+        <input type="text" id="linkName" placeholder="留空自动获取">
+      </div>
+      <div class="form-group">
+        <label>自定义图标 (可选)</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="btn btn-secondary" id="uploadIconBtn" style="padding:8px 12px;font-size:12px;">上传图标</button>
+          <span id="customIconStatus" style="font-size:12px;color:#999;">未选择</span>
+        </div>
+        <input type="file" id="iconFileInput" accept="image/*" style="display:none">
+        <div id="customIconPreview" style="display:none;margin-top:8px;">
+          <img id="customIconImg" style="width:32px;height:32px;border-radius:6px;">
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="saveLinkBtn">保存</button>
+        <button class="btn btn-secondary" id="cancelLinkBtn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 添加分组弹窗 -->
+  <div class="modal" id="groupModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title" id="groupModalTitle">添加分组</span>
+        <button class="close-btn" id="closeGroupModal">&times;</button>
+      </div>
+      <div class="form-group">
+        <label>分组名称</label>
+        <input type="text" id="groupName" placeholder="开发工具">
+      </div>
+      <div class="form-group">
+        <label>图标 (emoji)</label>
+        <input type="text" id="groupIcon" placeholder="💻" maxlength="2">
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="saveGroupBtn">保存</button>
+        <button class="btn btn-secondary" id="cancelGroupBtn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 设置弹窗 -->
+  <div class="modal" id="settingsModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-title">设置</span>
+        <button class="close-btn" id="closeSettingsModal">&times;</button>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">外观</div>
+        <div class="form-group">
+          <label>卡片透明度 (亮色模式)</label>
+          <input type="range" id="opacityLight" min="0" max="100" value="85" style="width:100%">
+          <span id="opacityLightVal" style="font-size:12px;color:var(--text-muted);">85%</span>
+        </div>
+        <div class="form-group">
+          <label>卡片透明度 (暗色模式)</label>
+          <input type="range" id="opacityDark" min="0" max="100" value="85" style="width:100%">
+          <span id="opacityDarkVal" style="font-size:12px;color:var(--text-muted);">85%</span>
+        </div>
+        <button class="btn btn-secondary" id="saveOpacityBtn" style="width:100%">应用透明度</button>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">背景</div>
+        <div class="form-group" style="margin-bottom:10px;">
+          <input type="text" id="bgUrl" placeholder="背景图片 URL (支持图床链接)">
+        </div>
+        <button class="btn btn-secondary" id="saveBgBtn" style="width:100%">应用背景</button>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">WebDAV 云同步</div>
+        <div class="form-group">
+          <label>服务器地址</label>
+          <input type="text" id="webdavUrl" placeholder="https://your-nas.com/webdav/newtab">
+        </div>
+        <div class="form-group">
+          <label>用户名</label>
+          <input type="text" id="webdavUser" placeholder="用户名">
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" id="webdavPass" placeholder="密码">
+        </div>
+        <div class="btn-group" style="margin-top:12px;">
+          <button class="btn btn-secondary" id="webdavSaveConfig">保存配置</button>
+        </div>
+        <div class="btn-group" style="margin-top:8px;">
+          <button class="btn btn-primary" id="webdavUpload">↑ 上传</button>
+          <button class="btn btn-secondary" id="webdavDownload">↓ 下载</button>
+        </div>
+        <div id="webdavStatus" style="font-size:12px;color:var(--text-muted);margin-top:8px;"></div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">本地数据</div>
+        <div class="settings-btns">
+          <button class="btn btn-secondary" id="exportBtn">📤 导出配置</button>
+          <button class="btn btn-secondary" id="importBtn">📥 导入配置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 同步提示弹窗 -->
+  <div class="modal" id="syncModal">
+    <div class="modal-content" style="max-width:320px;">
+      <div class="modal-header">
+        <span class="modal-title">🔄 发现云端更新</span>
+      </div>
+      <p style="font-size:14px;color:var(--text-secondary);margin-bottom:20px;line-height:1.6;">
+        云端配置与本地不同，是否使用云端配置覆盖本地？
+      </p>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="syncApplyRemote">使用云端</button>
+        <button class="btn btn-secondary" id="syncKeepLocal">保留本地</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="importFile" accept=".json" style="display:none">
+
+  <script src="main.js"></script>
+</body>
+</html>
