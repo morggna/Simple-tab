@@ -2,7 +2,7 @@
 
 一个简洁、美观、可自定义的 Chrome 新标签页扩展。
 
-![preview](https://raw.githubusercontent.com/YOUR_USERNAME/Simple-tab/main/screenshots/preview.png)
+![preview](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview.png)
 
 ## ✨ 特性
 
