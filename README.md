@@ -1,8 +1,9 @@
 # Simple-tab - 极简新标签页
 
 一个简洁、美观、可自定义的 Chrome 新标签页扩展。
-
-![preview](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview.png)
+![preview1](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview.png)
+![preview2](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview.png)
+![preview3](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview.png)
 
 ## ✨ 特性
 
@@ -108,6 +109,7 @@ Simple-tab/
 - WebDAV 同步为可选功能，需用户手动配置
 - 不收集任何用户数据
 - 不包含任何追踪代码
+- 结构简单，轻松审查
 
 ## 📝 更新日志
 
