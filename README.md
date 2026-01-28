@@ -1,8 +1,8 @@
-# Infinity Tab - 极简新标签页
+# Simple-tab - 极简新标签页
 
 一个简洁、美观、可自定义的 Chrome 新标签页扩展。
 
-![preview](https://raw.githubusercontent.com/YOUR_USERNAME/infinity-tab/main/screenshots/preview.png)
+![preview](https://raw.githubusercontent.com/YOUR_USERNAME/Simple-tab/main/screenshots/preview.png)
 
 ## ✨ 特性
 
@@ -19,7 +19,7 @@
 
 ### 方式：手动安装（开发者模式）
 
-1. 下载本仓库代码（[Download ZIP](https://github.com/YOUR_USERNAME/infinity-tab/archive/refs/heads/main.zip)）
+1. 下载本仓库代码（[Download ZIP](https://github.com/YOUR_USERNAME/Simple-tab/archive/refs/heads/main.zip)）
 2. 解压到本地文件夹
 3. 打开 Chrome，访问 `chrome://extensions/`
 4. 开启右上角「开发者模式」
@@ -84,7 +84,7 @@
 ## 📁 文件结构
 
 ```
-infinity-tab/
+Simple-tab/
 ├── manifest.json      # 扩展配置
 ├── newtab.html        # 主页面
 ├── main.js            # 核心逻辑
@@ -136,8 +136,3 @@ infinity-tab/
 ## 📄 许可证
 
 MIT License
-
-## 🙏 致谢
-
-- 图标来自 [Iconify](https://iconify.design/)
-- 灵感来自 [极简导航](https://nav.ops.ci/)
