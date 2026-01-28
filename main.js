@@ -52,6 +52,22 @@ var searchEngines = {
   baidu: { name: '百度', url: 'https://www.baidu.com/s?wd=' }
 };
 
+// 【新增】标准化 JSON 字符串转换（解决属性顺序不同导致的对比失败问题）
+// 确保 {a:1, b:2} 和 {b:2, a:1} 转换出的字符串完全一致
+function canonicalStringify(obj) {
+  if (obj === null || typeof obj !== 'object') {
+    return JSON.stringify(obj);
+  }
+  if (Array.isArray(obj)) {
+    return '[' + obj.map(canonicalStringify).join(',') + ']';
+  }
+  var keys = Object.keys(obj).sort();
+  var parts = keys.map(function(key) {
+    return JSON.stringify(key) + ':' + canonicalStringify(obj[key]);
+  });
+  return '{' + parts.join(',') + '}';
+}
+
 // 获取图标
 function getIconUrl(url, size) {
   try {
@@ -103,14 +119,12 @@ function saveData() {
   autoSyncToWebdav();
 }
 
-// 【修改】自动同步到 WebDAV（带轻微视觉反馈）
+// 【优化】自动同步到 WebDAV（带轻微视觉反馈）
 function autoSyncToWebdav() {
   loadWebdavConfig();
   if (!webdavConfig.url || !webdavConfig.user) return;
   
   var fileUrl = webdavConfig.url.replace(/\/$/, '') + '/newtab-config.json';
-  
-  // 获取设置按钮用于反馈
   var settingsBtn = document.getElementById('settingsBtn');
   
   fetch(fileUrl, {
@@ -122,7 +136,6 @@ function autoSyncToWebdav() {
     body: JSON.stringify(data, null, 2)
   })
   .then(function(response) {
-    // 200 OK, 201 Created, 204 No Content 都算成功
     if (response.ok || response.status === 201 || response.status === 204) {
       console.log('自动同步成功');
       // 成功反馈：齿轮变绿 1.5秒
@@ -144,7 +157,7 @@ function autoSyncToWebdav() {
   });
 }
 
-// 启动时检查云端同步
+// 【修复】启动时检查云端同步（使用 canonicalStringify）
 function checkCloudSync() {
   loadWebdavConfig();
   if (!webdavConfig.url || !webdavConfig.user) return;
@@ -164,16 +177,23 @@ function checkCloudSync() {
   .then(function(remoteData) {
     if (!remoteData || !remoteData.groups) return;
     
-    // 比较本地和远程数据
-    var localStr = JSON.stringify(data);
-    var remoteStr = JSON.stringify(remoteData);
+    // 使用标准化字符串进行对比，忽略 Key 的顺序差异
+    var localStr = canonicalStringify(data);
+    var remoteStr = canonicalStringify(remoteData);
+    
+    // 调试日志，按 F12 可见
+    console.log('检查同步 - 本地长度:', localStr.length, '云端长度:', remoteStr.length);
     
     if (localStr !== remoteStr) {
+      console.log('数据不一致，弹出提示');
       showSyncPrompt(remoteData);
+    } else {
+      console.log('数据一致，无需同步');
     }
   })
-  .catch(function() {
-    // 网络错误，静默忽略
+  .catch(function(err) {
+    // 网络错误静默忽略
+    console.warn('检查同步出错:', err);
   });
 }
 
@@ -202,15 +222,13 @@ function applyRemoteData() {
   document.getElementById('syncModal').classList.remove('active');
 }
 
-// 【修改】保留本地数据
+// 【优化】保留本地数据
 function keepLocalData() {
   window.pendingRemoteData = null;
   document.getElementById('syncModal').classList.remove('active');
   
-  // 关键逻辑修复：
-  // 既然用户选择保留本地，说明本地是最新的，
-  // 必须立即强制上传一次，覆盖云端的旧数据，
-  // 否则下次刷新页面还会检测到不一致并再次弹窗。
+  // 关键逻辑：既然保留本地，说明本地是最新的
+  // 立即强制上传覆盖云端，防止下次刷新再次弹窗
   console.log('用户选择保留本地，正在覆盖云端...');
   autoSyncToWebdav(); 
 }
@@ -225,7 +243,6 @@ function render() {
 // 应用背景
 function applyBackground() {
   if (data.bgUrl) {
-    // 预加载图片，加载完成后再显示
     var img = new Image();
     img.onload = function() {
       document.body.style.backgroundImage = 'url(' + data.bgUrl + ')';
@@ -396,8 +413,6 @@ function bindEvents() {
     }
   }
 }
-
-// 更新编辑按钮状态（不再需要全局更新）
 
 // 打开编辑分组弹窗
 function openEditGroupModal(index) {
