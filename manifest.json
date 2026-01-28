@@ -3,7 +3,13 @@
   "name": "My New Tab",
   "version": "5.2",
   "description": "极简导航 - 快速访问",
-  "permissions": ["storage"],
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
