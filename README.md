@@ -1,9 +1,9 @@
 # Simple-tab - 极简新标签页
 
 一个简洁、美观、可自定义的 Chrome 新标签页扩展。
-![preview1](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview.png)
-![preview2](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview.png)
-![preview3](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview.png)
+![preview1](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview1.png)
+![preview2](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview2.png)
+![preview3](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview3.png)
 
 ## ✨ 特性
 
