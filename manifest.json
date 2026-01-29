@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "My New Tab",
-  "version": "5.2",
+  "name": "Simple Tab",
+  "version": "5.3",
   "description": "极简导航 - 快速访问",
   "permissions": [
     "storage"
   ],
-  "host_permissions": [
+  "optional_host_permissions": [
     "http://*/*",
     "https://*/*"
   ],

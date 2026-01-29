@@ -112,16 +112,56 @@ function saveData() {
   autoSyncToWebdav();
 }
 
-// 【关键修复】自动同步函数：增加了对UI状态文字的更新
+// 检查是否有主机权限
+function checkHostPermission(callback) {
+  if (typeof chrome === 'undefined' || !chrome.permissions) {
+    callback(true); // 非扩展环境，直接通过
+    return;
+  }
+  
+  chrome.permissions.contains({
+    origins: ['http://*/*', 'https://*/*']
+  }, function(result) {
+    callback(result);
+  });
+}
+
+// 请求主机权限
+function requestHostPermission(callback) {
+  if (typeof chrome === 'undefined' || !chrome.permissions) {
+    callback(true);
+    return;
+  }
+  
+  chrome.permissions.request({
+    origins: ['http://*/*', 'https://*/*']
+  }, function(granted) {
+    callback(granted);
+  });
+}
+
+// 自动同步函数
 function autoSyncToWebdav() {
   var cfg = data.webdav;
   if (!cfg || !cfg.url || !cfg.user) return;
   
+  // 先检查权限
+  checkHostPermission(function(hasPermission) {
+    if (!hasPermission) {
+      console.log('没有主机权限，跳过自动同步');
+      return;
+    }
+    doWebdavSync();
+  });
+}
+
+// 执行实际的 WebDAV 同步
+function doWebdavSync() {
+  var cfg = data.webdav;
   var fileUrl = cfg.url.replace(/\/$/, '') + '/newtab-config.json';
   var settingsBtn = document.getElementById('settingsBtn');
   var statusEl = document.getElementById('webdavStatus');
   
-  // 返回 fetch Promise，虽然 saveData 不等待它，但这对代码健壮性有好处
   return fetch(fileUrl, {
     method: 'PUT',
     headers: {
@@ -134,16 +174,13 @@ function autoSyncToWebdav() {
     if (response.ok || response.status === 201 || response.status === 204) {
       console.log('自动同步成功');
       
-      // 1. 更新右上角齿轮颜色 (静默反馈)
       if(settingsBtn) {
         settingsBtn.style.color = '#27ae60';
         setTimeout(function() { settingsBtn.style.color = ''; }, 1500);
       }
 
-      // 2. 【新增】更新设置面板里的状态文字 (解决“卡住”的假象)
       if (statusEl) {
         showWebdavStatus('同步成功 ✓', 'success');
-        // 3秒后清除成功提示，保持界面整洁
         setTimeout(function() { 
           if(statusEl.textContent.includes('成功')) statusEl.textContent = ''; 
         }, 3000);
@@ -156,12 +193,10 @@ function autoSyncToWebdav() {
   .catch(function(err) {
     console.error('自动同步失败', err);
     
-    // 失败反馈
     if(settingsBtn) {
         settingsBtn.style.color = '#e74c3c';
         setTimeout(function() { settingsBtn.style.color = ''; }, 3000);
     }
-    // 失败时必须显示错误信息，并且不要自动消失
     showWebdavStatus('同步失败: ' + err.message, 'error');
   });
 }
@@ -170,28 +205,33 @@ function checkCloudSync() {
   var cfg = data.webdav;
   if (!cfg || !cfg.url || !cfg.user) return;
   
-  var fileUrl = cfg.url.replace(/\/$/, '') + '/newtab-config.json';
-  
-  fetch(fileUrl, {
-    method: 'GET',
-    headers: { 'Authorization': 'Basic ' + btoa(cfg.user + ':' + cfg.pass) }
-  })
-  .then(function(response) {
-    if (!response.ok) return null;
-    return response.json();
-  })
-  .then(function(remoteData) {
-    if (!remoteData || !remoteData.groups) return;
+  // 先检查权限
+  checkHostPermission(function(hasPermission) {
+    if (!hasPermission) return;
     
-    var localStr = canonicalStringify(data);
-    var remoteStr = canonicalStringify(remoteData);
+    var fileUrl = cfg.url.replace(/\/$/, '') + '/newtab-config.json';
     
-    if (localStr !== remoteStr) {
-      showSyncPrompt(remoteData);
-    }
-  })
-  .catch(function(err) {
-    console.warn('检查同步出错:', err);
+    fetch(fileUrl, {
+      method: 'GET',
+      headers: { 'Authorization': 'Basic ' + btoa(cfg.user + ':' + cfg.pass) }
+    })
+    .then(function(response) {
+      if (!response.ok) return null;
+      return response.json();
+    })
+    .then(function(remoteData) {
+      if (!remoteData || !remoteData.groups) return;
+      
+      var localStr = canonicalStringify(data);
+      var remoteStr = canonicalStringify(remoteData);
+      
+      if (localStr !== remoteStr) {
+        showSyncPrompt(remoteData);
+      }
+    })
+    .catch(function(err) {
+      console.warn('检查同步出错:', err);
+    });
   });
 }
 
@@ -382,6 +422,7 @@ function bindEvents() {
 function setupDragAndDrop(groupIndex) { var linksRow = document.querySelector('.links-row[data-group-index="' + groupIndex + '"]'); if (!linksRow) return; var linkCards = linksRow.querySelectorAll('.link-card'); linkCards.forEach(function(card) { card.setAttribute('draggable', 'true'); card.addEventListener('click', function(e) { if (editingGroupIndex !== null) { e.preventDefault(); } }); card.addEventListener('dragstart', function(e) { if (editingGroupIndex === null) { e.preventDefault(); return; } this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', JSON.stringify({ groupIndex: this.getAttribute('data-group'), linkIndex: this.getAttribute('data-link') })); }); card.addEventListener('dragend', function() { this.classList.remove('dragging'); document.querySelectorAll('.link-card').forEach(function(c) { c.classList.remove('drag-over'); }); }); card.addEventListener('dragover', function(e) { if (editingGroupIndex === null) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; this.classList.add('drag-over'); }); card.addEventListener('dragleave', function() { this.classList.remove('drag-over'); }); card.addEventListener('drop', function(e) { if (editingGroupIndex === null) return; e.preventDefault(); this.classList.remove('drag-over'); var sourceData = JSON.parse(e.dataTransfer.getData('text/plain')); var targetGroupIndex = parseInt(this.getAttribute('data-group')); var targetLinkIndex = parseInt(this.getAttribute('data-link')); var sourceGroupIndex = parseInt(sourceData.groupIndex); var sourceLinkIndex = parseInt(sourceData.linkIndex); if (sourceGroupIndex === targetGroupIndex && sourceLinkIndex === targetLinkIndex) { return; } if (sourceGroupIndex === targetGroupIndex) { var links = data.groups[sourceGroupIndex].links; var movedLink = links.splice(sourceLinkIndex, 1)[0]; links.splice(targetLinkIndex, 0, movedLink); saveData(); renderGroups(); } }); }); }
 function setupGroupDragAndDrop() { var groupSections = document.querySelectorAll('.group-section'); groupSections.forEach(function(section) { var header = section.querySelector('.group-header'); section.setAttribute('draggable', 'true'); section.addEventListener('dragstart', function(e) { if (editingGroupIndex === null) { e.preventDefault(); return; } if (!e.target.classList.contains('group-section')) return; this.classList.add('dragging-group'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/group', this.getAttribute('data-group-index')); }); section.addEventListener('dragend', function() { this.classList.remove('dragging-group'); document.querySelectorAll('.group-section').forEach(function(s) { s.classList.remove('drag-over-group'); }); }); section.addEventListener('dragover', function(e) { if (editingGroupIndex === null) return; if (e.dataTransfer.types.includes('application/group')) { e.preventDefault(); this.classList.add('drag-over-group'); } }); section.addEventListener('dragleave', function() { this.classList.remove('drag-over-group'); }); section.addEventListener('drop', function(e) { if (editingGroupIndex === null) return; if (!e.dataTransfer.types.includes('application/group')) return; e.preventDefault(); this.classList.remove('drag-over-group'); var sourceIndex = parseInt(e.dataTransfer.getData('application/group')); var targetIndex = parseInt(this.getAttribute('data-group-index')); if (sourceIndex === targetIndex) return; var movedGroup = data.groups.splice(sourceIndex, 1)[0]; data.groups.splice(targetIndex, 0, movedGroup); if (editingGroupIndex === sourceIndex) { editingGroupIndex = targetIndex; } else if (sourceIndex < editingGroupIndex && targetIndex >= editingGroupIndex) { editingGroupIndex--; } else if (sourceIndex > editingGroupIndex && targetIndex <= editingGroupIndex) { editingGroupIndex++; } saveData(); renderGroups(); }); }); }
 function setupUrlPreview(id1, id2, id3, id4) { var urlInput = document.getElementById(id1); var timer; urlInput.addEventListener('input', function() { clearTimeout(timer); var url = this.value.trim(); timer = setTimeout(function() { if (url && (url.startsWith('http') || url.includes('.'))) { if (!url.startsWith('http')) url = 'https://' + url; var iconUrl = getIconUrl(url); var domain = getDomainName(url); if (iconUrl) { document.getElementById(id3).src = iconUrl; document.getElementById(id4).textContent = domain; document.getElementById(id2).style.display = 'flex'; } } else { document.getElementById(id2).style.display = 'none'; } }, 300); }); }
+function openEditGroupModal(index) { currentGroupIndex = index; var group = data.groups[index]; document.getElementById('groupName').value = group.name; document.getElementById('groupIcon').value = group.icon; document.getElementById('groupModalTitle').textContent = '编辑分组'; document.getElementById('groupModal').classList.add('active'); }
 
 function openLinkModal() { currentLinkIndex = null; document.getElementById('linkUrl').value = ''; document.getElementById('linkName').value = ''; document.getElementById('linkPreview').style.display = 'none'; document.getElementById('linkModalTitle').textContent = '添加链接'; customIconBase64 = null; document.getElementById('customIconStatus').textContent = '未选择'; document.getElementById('customIconPreview').style.display = 'none'; document.getElementById('linkModal').classList.add('active'); document.getElementById('linkUrl').focus(); }
 function openEditLinkModal(gIdx, lIdx) { currentGroupIndex = gIdx; currentLinkIndex = lIdx; var link = data.groups[gIdx].links[lIdx]; document.getElementById('linkUrl').value = link.url; document.getElementById('linkName').value = link.name; document.getElementById('linkModalTitle').textContent = '编辑链接'; var iconUrl = link.customIcon || getIconUrl(link.url); if (iconUrl) { document.getElementById('linkPreviewIcon').src = iconUrl; document.getElementById('linkPreviewDomain').textContent = getDomainName(link.url); document.getElementById('linkPreview').style.display = 'flex'; } if (link.customIcon) { customIconBase64 = link.customIcon; document.getElementById('customIconStatus').textContent = '已设置'; document.getElementById('customIconImg').src = link.customIcon; document.getElementById('customIconPreview').style.display = 'block'; } else { customIconBase64 = null; document.getElementById('customIconStatus').textContent = '未选择'; document.getElementById('customIconPreview').style.display = 'none'; } document.getElementById('linkModal').classList.add('active'); }
@@ -392,12 +433,26 @@ function closeGroupModal() { document.getElementById('groupModal').classList.rem
 function saveGroup() { var name = document.getElementById('groupName').value.trim(); var icon = document.getElementById('groupIcon').value.trim() || '📁'; if (!name) return; if (currentGroupIndex !== null) { data.groups[currentGroupIndex].name = name; data.groups[currentGroupIndex].icon = icon; } else { data.groups.push({name:name, icon:icon, links:[]}); } saveData(); render(); closeGroupModal(); }
 function doSearch() { var q = document.getElementById('searchInput').value.trim(); if (!q) return; window.location.href = searchEngines[data.searchEngine].url + encodeURIComponent(q); }
 
+// WebDAV 保存配置 - 带权限请求
 function saveWebdavConfig() {
   data.webdav.url = document.getElementById('webdavUrl').value.trim();
   data.webdav.user = document.getElementById('webdavUser').value.trim();
   data.webdav.pass = document.getElementById('webdavPass').value;
-  showWebdavStatus('配置已更新，正在同步...', 'info');
-  saveData();
+  
+  if (!data.webdav.url) {
+    showWebdavStatus('请填写服务器地址', 'error');
+    return;
+  }
+  
+  // 请求主机权限
+  requestHostPermission(function(granted) {
+    if (granted) {
+      showWebdavStatus('配置已保存，正在同步...', 'info');
+      saveData();
+    } else {
+      showWebdavStatus('需要授权才能使用云同步', 'error');
+    }
+  });
 }
 
 function showWebdavStatus(msg, type) {
@@ -409,13 +464,45 @@ function showWebdavStatus(msg, type) {
 function webdavUpload() {
   var cfg = data.webdav;
   if (!cfg.url) { showWebdavStatus('请先保存 WebDAV 设置', 'error'); return; }
-  showWebdavStatus('上传中...', 'info');
-  autoSyncToWebdav(); 
+  
+  checkHostPermission(function(hasPermission) {
+    if (!hasPermission) {
+      requestHostPermission(function(granted) {
+        if (granted) {
+          showWebdavStatus('上传中...', 'info');
+          doWebdavSync();
+        } else {
+          showWebdavStatus('需要授权才能同步', 'error');
+        }
+      });
+    } else {
+      showWebdavStatus('上传中...', 'info');
+      doWebdavSync();
+    }
+  });
 }
 
 function webdavDownload() {
   var cfg = data.webdav;
   if (!cfg.url) { showWebdavStatus('请先保存 WebDAV 设置', 'error'); return; }
+  
+  checkHostPermission(function(hasPermission) {
+    if (!hasPermission) {
+      requestHostPermission(function(granted) {
+        if (granted) {
+          doWebdavDownload();
+        } else {
+          showWebdavStatus('需要授权才能同步', 'error');
+        }
+      });
+    } else {
+      doWebdavDownload();
+    }
+  });
+}
+
+function doWebdavDownload() {
+  var cfg = data.webdav;
   showWebdavStatus('下载中...', 'info');
   var fileUrl = cfg.url.replace(/\/$/, '') + '/newtab-config.json';
   fetch(fileUrl, {
