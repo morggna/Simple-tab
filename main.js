@@ -112,29 +112,63 @@ function saveData() {
   autoSyncToWebdav();
 }
 
-// 检查是否有主机权限
-function checkHostPermission(callback) {
-  if (typeof chrome === 'undefined' || !chrome.permissions) {
-    callback(true); // 非扩展环境，直接通过
-    return;
+// 从 URL 提取 origin 用于权限请求
+function getOriginPattern(url) {
+  try {
+    var u = new URL(url);
+    return u.origin + '/*';
+  } catch (e) {
+    return null;
   }
-  
-  chrome.permissions.contains({
-    origins: ['http://*/*', 'https://*/*']
-  }, function(result) {
-    callback(result);
-  });
 }
 
-// 请求主机权限
-function requestHostPermission(callback) {
+// 检查是否有指定 URL 的权限
+function checkHostPermission(callback, url) {
   if (typeof chrome === 'undefined' || !chrome.permissions) {
     callback(true);
     return;
   }
   
+  var targetUrl = url || (data.webdav && data.webdav.url);
+  if (!targetUrl) {
+    callback(false);
+    return;
+  }
+  
+  var origin = getOriginPattern(targetUrl);
+  if (!origin) {
+    callback(false);
+    return;
+  }
+  
+  chrome.permissions.contains({
+    origins: [origin]
+  }, function(result) {
+    callback(result);
+  });
+}
+
+// 请求指定 URL 的权限
+function requestHostPermission(callback, url) {
+  if (typeof chrome === 'undefined' || !chrome.permissions) {
+    callback(true);
+    return;
+  }
+  
+  var targetUrl = url || (data.webdav && data.webdav.url);
+  if (!targetUrl) {
+    callback(false);
+    return;
+  }
+  
+  var origin = getOriginPattern(targetUrl);
+  if (!origin) {
+    callback(false);
+    return;
+  }
+  
   chrome.permissions.request({
-    origins: ['http://*/*', 'https://*/*']
+    origins: [origin]
   }, function(granted) {
     callback(granted);
   });
@@ -435,24 +469,27 @@ function doSearch() { var q = document.getElementById('searchInput').value.trim(
 
 // WebDAV 保存配置 - 带权限请求
 function saveWebdavConfig() {
-  data.webdav.url = document.getElementById('webdavUrl').value.trim();
-  data.webdav.user = document.getElementById('webdavUser').value.trim();
-  data.webdav.pass = document.getElementById('webdavPass').value;
+  var url = document.getElementById('webdavUrl').value.trim();
+  var user = document.getElementById('webdavUser').value.trim();
+  var pass = document.getElementById('webdavPass').value;
   
-  if (!data.webdav.url) {
+  if (!url) {
     showWebdavStatus('请填写服务器地址', 'error');
     return;
   }
   
-  // 请求主机权限
+  // 请求该 WebDAV 服务器的权限
   requestHostPermission(function(granted) {
     if (granted) {
+      data.webdav.url = url;
+      data.webdav.user = user;
+      data.webdav.pass = pass;
       showWebdavStatus('配置已保存，正在同步...', 'info');
       saveData();
     } else {
-      showWebdavStatus('需要授权才能使用云同步', 'error');
+      showWebdavStatus('需要授权才能访问该服务器', 'error');
     }
-  });
+  }, url);
 }
 
 function showWebdavStatus(msg, type) {
