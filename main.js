@@ -44,26 +44,24 @@ var suggestApis = {
     url: 'https://suggestqueries.google.com/complete/search?client=chrome&q=',
     origin: 'https://suggestqueries.google.com/*',
     parse: function(data) { return data[1] || []; },
-    useJsonp: false
+    encoding: 'utf-8'
   },
   bing: {
     url: 'https://api.bing.com/osjson.aspx?query=',
     origin: 'https://api.bing.com/*',
     parse: function(data) { return data[1] || []; },
-    useJsonp: false
+    encoding: 'utf-8'
   },
   baidu: {
-    // 百度用 JSONP，避免编码问题
-    url: 'https://suggestion.baidu.com/su?cb=baiduCallback&wd=',
+    url: 'https://suggestion.baidu.com/su?action=opensearch&wd=',
     origin: 'https://suggestion.baidu.com/*',
-    parse: function(data) { return data.s || []; },
-    useJsonp: true
+    parse: function(data) { return data[1] || []; },
+    encoding: 'gbk'
   }
 };
 
 var suggestTimer = null;
 var suggestPermissionGranted = {}; // 缓存已授权的搜索引擎
-var baiduCallbackData = null;
 
 function canonicalStringify(obj) {
   if (obj === null || typeof obj !== 'object') {
@@ -562,9 +560,21 @@ function fetchSuggestions(query, engine) {
 }
 
 function doFetchSuggestions(query, engine, api) {
-  if (api.useJsonp && engine === 'baidu') {
-    // 百度使用 JSONP
-    fetchBaiduSuggestions(query, api);
+  if (api.encoding === 'gbk') {
+    // 百度 GBK 编码，用 ArrayBuffer 解码
+    fetch(api.url + encodeURIComponent(query))
+      .then(function(r) { return r.arrayBuffer(); })
+      .then(function(buffer) {
+        var decoder = new TextDecoder('gbk');
+        var text = decoder.decode(buffer);
+        var data = JSON.parse(text);
+        var suggestions = api.parse(data);
+        showSuggestions(suggestions.slice(0, 8));
+      })
+      .catch(function(err) {
+        console.warn('获取搜索建议失败:', err);
+        hideSuggestions();
+      });
   } else {
     fetch(api.url + encodeURIComponent(query))
       .then(function(r) { return r.json(); })
@@ -577,35 +587,6 @@ function doFetchSuggestions(query, engine, api) {
         hideSuggestions();
       });
   }
-}
-
-// 百度 JSONP 回调
-window.baiduCallback = function(data) {
-  baiduCallbackData = data;
-};
-
-function fetchBaiduSuggestions(query, api) {
-  // 移除旧的 script 标签
-  var oldScript = document.getElementById('baiduSuggestScript');
-  if (oldScript) oldScript.remove();
-  
-  var script = document.createElement('script');
-  script.id = 'baiduSuggestScript';
-  script.src = api.url + encodeURIComponent(query);
-  script.onload = function() {
-    if (baiduCallbackData) {
-      var suggestions = api.parse(baiduCallbackData);
-      showSuggestions(suggestions.slice(0, 8));
-      baiduCallbackData = null;
-    }
-    script.remove();
-  };
-  script.onerror = function() {
-    console.warn('百度搜索建议加载失败');
-    hideSuggestions();
-    script.remove();
-  };
-  document.head.appendChild(script);
 }
 
 function showSuggestions(suggestions) {
