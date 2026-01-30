@@ -38,6 +38,28 @@ var searchEngines = {
   baidu: { name: '百度', url: 'https://www.baidu.com/s?wd=' }
 };
 
+// 搜索建议 API 配置
+var suggestApis = {
+  google: {
+    url: 'https://suggestqueries.google.com/complete/search?client=chrome&q=',
+    origin: 'https://suggestqueries.google.com/*',
+    parse: function(data) { return data[1] || []; }
+  },
+  bing: {
+    url: 'https://api.bing.com/osjson.aspx?query=',
+    origin: 'https://api.bing.com/*',
+    parse: function(data) { return data[1] || []; }
+  },
+  baidu: {
+    url: 'https://suggestion.baidu.com/su?action=opensearch&wd=',
+    origin: 'https://suggestion.baidu.com/*',
+    parse: function(data) { return data[1] || []; }
+  }
+};
+
+var suggestTimer = null;
+var suggestPermissionGranted = {}; // 缓存已授权的搜索引擎
+
 function canonicalStringify(obj) {
   if (obj === null || typeof obj !== 'object') {
     return JSON.stringify(obj);
@@ -465,7 +487,184 @@ function saveLink() { var url = document.getElementById('linkUrl').value.trim();
 function openGroupModal() { currentGroupIndex = null; document.getElementById('groupName').value = ''; document.getElementById('groupIcon').value = ''; document.getElementById('groupModalTitle').textContent = '添加分组'; document.getElementById('groupModal').classList.add('active'); document.getElementById('groupName').focus(); }
 function closeGroupModal() { document.getElementById('groupModal').classList.remove('active'); }
 function saveGroup() { var name = document.getElementById('groupName').value.trim(); var icon = document.getElementById('groupIcon').value.trim() || '📁'; if (!name) return; if (currentGroupIndex !== null) { data.groups[currentGroupIndex].name = name; data.groups[currentGroupIndex].icon = icon; } else { data.groups.push({name:name, icon:icon, links:[]}); } saveData(); render(); closeGroupModal(); }
-function doSearch() { var q = document.getElementById('searchInput').value.trim(); if (!q) return; window.location.href = searchEngines[data.searchEngine].url + encodeURIComponent(q); }
+function doSearch() { var q = document.getElementById('searchInput').value.trim(); if (!q) return; hideSuggestions(); window.location.href = searchEngines[data.searchEngine].url + encodeURIComponent(q); }
+
+// 搜索建议功能
+function checkSuggestPermission(engine, callback) {
+  if (typeof chrome === 'undefined' || !chrome.permissions) {
+    callback(true);
+    return;
+  }
+  
+  if (suggestPermissionGranted[engine]) {
+    callback(true);
+    return;
+  }
+  
+  var api = suggestApis[engine];
+  if (!api) {
+    callback(false);
+    return;
+  }
+  
+  chrome.permissions.contains({
+    origins: [api.origin]
+  }, function(result) {
+    if (result) suggestPermissionGranted[engine] = true;
+    callback(result);
+  });
+}
+
+function requestSuggestPermission(engine, callback) {
+  if (typeof chrome === 'undefined' || !chrome.permissions) {
+    callback(true);
+    return;
+  }
+  
+  var api = suggestApis[engine];
+  if (!api) {
+    callback(false);
+    return;
+  }
+  
+  chrome.permissions.request({
+    origins: [api.origin]
+  }, function(granted) {
+    if (granted) suggestPermissionGranted[engine] = true;
+    callback(granted);
+  });
+}
+
+function fetchSuggestions(query, engine) {
+  var api = suggestApis[engine];
+  if (!api || !query.trim()) {
+    hideSuggestions();
+    return;
+  }
+  
+  checkSuggestPermission(engine, function(hasPermission) {
+    if (!hasPermission) {
+      // 没有权限，首次输入时请求
+      requestSuggestPermission(engine, function(granted) {
+        if (granted) {
+          doFetchSuggestions(query, engine, api);
+        }
+      });
+    } else {
+      doFetchSuggestions(query, engine, api);
+    }
+  });
+}
+
+function doFetchSuggestions(query, engine, api) {
+  fetch(api.url + encodeURIComponent(query))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var suggestions = api.parse(data);
+      showSuggestions(suggestions.slice(0, 8));
+    })
+    .catch(function(err) {
+      console.warn('获取搜索建议失败:', err);
+      hideSuggestions();
+    });
+}
+
+function showSuggestions(suggestions) {
+  var container = document.getElementById('suggestionsContainer');
+  if (!container || !suggestions || suggestions.length === 0) {
+    hideSuggestions();
+    return;
+  }
+  
+  var html = '';
+  suggestions.forEach(function(s) {
+    html += '<div class="suggestion-item">' + escapeHtml(s) + '</div>';
+  });
+  
+  container.innerHTML = html;
+  container.style.display = 'block';
+  
+  // 绑定点击事件
+  container.querySelectorAll('.suggestion-item').forEach(function(item) {
+    item.addEventListener('click', function() {
+      document.getElementById('searchInput').value = this.textContent;
+      hideSuggestions();
+      doSearch();
+    });
+  });
+}
+
+function hideSuggestions() {
+  var container = document.getElementById('suggestionsContainer');
+  if (container) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+  }
+}
+
+function escapeHtml(text) {
+  var div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function setupSearchSuggestions() {
+  var input = document.getElementById('searchInput');
+  
+  input.addEventListener('input', function() {
+    var query = this.value.trim();
+    
+    clearTimeout(suggestTimer);
+    
+    if (!query) {
+      hideSuggestions();
+      return;
+    }
+    
+    // 防抖，300ms 后请求
+    suggestTimer = setTimeout(function() {
+      fetchSuggestions(query, data.searchEngine);
+    }, 300);
+  });
+  
+  input.addEventListener('keydown', function(e) {
+    var container = document.getElementById('suggestionsContainer');
+    var items = container ? container.querySelectorAll('.suggestion-item') : [];
+    var activeItem = container ? container.querySelector('.suggestion-item.active') : null;
+    var activeIndex = -1;
+    
+    items.forEach(function(item, i) {
+      if (item.classList.contains('active')) activeIndex = i;
+    });
+    
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (items.length > 0) {
+        if (activeItem) activeItem.classList.remove('active');
+        activeIndex = (activeIndex + 1) % items.length;
+        items[activeIndex].classList.add('active');
+        input.value = items[activeIndex].textContent;
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (items.length > 0) {
+        if (activeItem) activeItem.classList.remove('active');
+        activeIndex = activeIndex <= 0 ? items.length - 1 : activeIndex - 1;
+        items[activeIndex].classList.add('active');
+        input.value = items[activeIndex].textContent;
+      }
+    } else if (e.key === 'Escape') {
+      hideSuggestions();
+    }
+  });
+  
+  // 点击外部关闭建议
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.search-box')) {
+      hideSuggestions();
+    }
+  });
+}
 
 // WebDAV 保存配置 - 带权限请求
 function saveWebdavConfig() {
@@ -592,9 +791,10 @@ function handleImport(e) {
 
 document.addEventListener('DOMContentLoaded', function() {
   setupUrlPreview('linkUrl', 'linkPreview', 'linkPreviewIcon', 'linkPreviewDomain');
+  setupSearchSuggestions();
 
   document.getElementById('searchBtn').addEventListener('click', doSearch);
-  document.getElementById('searchInput').addEventListener('keypress', function(e) { if (e.key === 'Enter') doSearch(); });
+  document.getElementById('searchInput').addEventListener('keypress', function(e) { if (e.key === 'Enter') { hideSuggestions(); doSearch(); } });
   document.getElementById('addGroupBtn').addEventListener('click', openGroupModal);
   document.getElementById('closeGroupModal').addEventListener('click', closeGroupModal);
   document.getElementById('saveGroupBtn').addEventListener('click', saveGroup);

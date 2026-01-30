@@ -59,6 +59,7 @@
 
     /* 搜索框 */
     .search-box {
+      position: relative;
       display: flex;
       align-items: center;
       background: var(--bg-card);
@@ -127,6 +128,39 @@
       width: 20px;
       height: 20px;
       fill: #fff;
+    }
+
+    /* 搜索建议 */
+    .suggestions-container {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      margin-top: 8px;
+      background: var(--bg-card);
+      border-radius: 16px;
+      box-shadow: 0 4px 20px var(--shadow);
+      overflow: hidden;
+      z-index: 50;
+    }
+
+    .suggestion-item {
+      padding: 12px 20px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-secondary);
+      transition: background 0.15s;
+    }
+
+    .suggestion-item:hover,
+    .suggestion-item.active {
+      background: rgba(52, 152, 219, 0.1);
+    }
+
+    [data-theme="dark"] .suggestion-item:hover,
+    [data-theme="dark"] .suggestion-item.active {
+      background: rgba(52, 152, 219, 0.2);
     }
 
     /* 分组区域 */
@@ -663,6 +697,8 @@
     <button class="search-btn" id="searchBtn">
       <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
     </button>
+    <!-- 搜索建议容器 -->
+    <div class="suggestions-container" id="suggestionsContainer"></div>
   </div>
 
   <!-- 分组容器 -->
