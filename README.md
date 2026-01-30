@@ -1,6 +1,7 @@
 # Simple-tab - 极简新标签页
 
 一个简洁、美观、可自定义的 Chrome 新标签页扩展。
+
 ![preview1](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview1.png)
 ![preview2](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview2.png)
 ![preview3](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview3.png)
@@ -10,17 +11,19 @@
 - 🎨 **简洁美观** - 极简设计风格，支持亮色/暗色主题
 - 📁 **分组管理** - 链接分组整理，支持 emoji 图标
 - 🔍 **多搜索引擎** - Google、Bing、百度一键切换
+- 💡 **搜索建议** - 实时显示搜索引擎联想词
 - 🖼️ **自定义背景** - 支持任意图床链接
 - ☁️ **WebDAV 同步** - 跨设备配置同步（支持 Synology、坚果云等）
 - 🎚️ **透明度调节** - 自定义卡片透明度
 - 📦 **导入导出** - JSON 格式配置备份
 - ✏️ **拖拽排序** - 链接和分组均可拖拽排序
+- 🔒 **最小权限** - 按需请求权限，不索取不必要的权限
 
 ## 📦 安装
 
 ### 方式：手动安装（开发者模式）
 
-1. 下载本仓库代码（[Download ZIP](https://github.com/YOUR_USERNAME/Simple-tab/archive/refs/heads/main.zip)）
+1. 下载本仓库代码（[Download ZIP](https://github.com/morggna/Simple-tab/archive/refs/heads/main.zip)）
 2. 解压到本地文件夹
 3. 打开 Chrome，访问 `chrome://extensions/`
 4. 开启右上角「开发者模式」
@@ -43,7 +46,14 @@
 | 拖拽链接 | 编辑模式下可排序 |
 | 拖拽分组 | 编辑模式下可排序 |
 
-自动抓取网站相关图标与标题，如抓取不到推荐通过https://iconify.design/ 获取心仪图标，指出本地上传定制
+自动抓取网站相关图标与标题，如抓取不到推荐通过 https://iconify.design/ 获取心仪图标，支持本地上传定制
+
+### 搜索建议
+
+在搜索框输入时会实时显示搜索引擎的联想词：
+- 支持 Google、Bing、百度三个搜索引擎
+- 使用 ↑↓ 键选择建议，Enter 搜索
+- 首次使用时会请求对应搜索引擎的权限（可选权限，可拒绝）
 
 ### 设置选项
 
@@ -85,6 +95,19 @@
 - **自动上传**：每次修改配置后自动上传到云端
 - **启动检查**：打开新标签页时检查云端是否有更新
 - **冲突处理**：发现不一致时弹窗询问使用云端还是本地
+- **按需授权**：首次配置时请求该服务器的访问权限
+
+## 🔒 权限说明
+
+本扩展采用最小权限原则：
+
+| 权限 | 用途 | 类型 |
+|------|------|------|
+| `storage` | 保存链接、分组、主题等配置 | 必需 |
+| 搜索引擎 API | 获取搜索建议 | 可选，首次使用时请求 |
+| WebDAV 服务器 | 云同步配置 | 可选，配置时请求 |
+
+不使用搜索建议或 WebDAV 的用户不会看到任何权限请求。
 
 ## 📁 文件结构
 
@@ -97,6 +120,7 @@ Simple-tab/
 ├── icon16.png         # 16x16 图标
 ├── icon48.png         # 48x48 图标
 ├── icon128.png        # 128x128 图标
+├── PRIVACY.md         # 隐私政策
 └── README.md          # 说明文档
 ```
 
@@ -105,17 +129,31 @@ Simple-tab/
 - 原生 HTML/CSS/JavaScript
 - Chrome Extension Manifest V3
 - Chrome Storage API
+- Chrome Permissions API（动态权限）
 - WebDAV 协议
 
 ## 🔒 隐私说明
 
 - 所有数据存储在本地（Chrome Storage）
 - WebDAV 同步为可选功能，需用户手动配置
+- 搜索建议直接请求搜索引擎官方 API，不经过第三方
 - 不收集任何用户数据
 - 不包含任何追踪代码
-- 结构简单，轻松审查
+- 代码结构简单，欢迎审查
+
+详见 [隐私政策](PRIVACY.md)
 
 ## 📝 更新日志
+
+### v5.4 (2025-01-30)
+- 新增搜索建议功能（支持 Google、Bing、百度）
+- 搜索建议支持键盘上下选择
+- 优化权限请求机制，按需请求特定域名权限
+
+### v5.3 (2025-01-30)
+- WebDAV 同步改用动态权限请求
+- 只申请用户配置的服务器权限，不再请求所有网站权限
+- 更符合最小权限原则
 
 ### v5.2 (2025-01-29)
 - 新增 WebDAV 云同步功能
