@@ -26,12 +26,6 @@ var defaultData = {
   webdav: { url: '', user: '', pass: '' }
 };
 
-var data = null;
-var currentGroupIndex = null;
-var currentLinkIndex = null;
-var urlInputTimer = null;
-var customIconBase64 = null;
-
 var searchEngines = {
   google: { name: 'Google', url: 'https://www.google.com/search?q=' },
   bing: { name: 'Bing', url: 'https://www.bing.com/search?q=' },
@@ -60,8 +54,39 @@ var suggestApis = {
   }
 };
 
+// 【优化关键 2】立即同步读取本地缓存，不等待 DOM
+var data = null;
+try {
+  var cachedStr = localStorage.getItem('newtabData');
+  if (cachedStr) {
+    data = JSON.parse(cachedStr);
+  }
+} catch(e) {}
+
+if (!data) {
+  data = JSON.parse(JSON.stringify(defaultData));
+}
+
+// 确保兼容性字段存在
+if (typeof data.theme === 'undefined') data.theme = localStorage.getItem('theme') || 'light';
+if (typeof data.opacityLight === 'undefined') data.opacityLight = 85;
+if (typeof data.opacityDark === 'undefined') data.opacityDark = 85;
+if (!data.webdav) {
+  // 尝试读取旧配置
+  var oldConfig = localStorage.getItem('webdavConfig');
+  if (oldConfig) {
+    try { data.webdav = JSON.parse(oldConfig); } catch(e) { data.webdav = { url:'', user:'', pass:'' }; }
+  } else {
+    data.webdav = { url:'', user:'', pass:'' };
+  }
+}
+
+var currentGroupIndex = null;
+var currentLinkIndex = null;
+var urlInputTimer = null;
+var customIconBase64 = null;
 var suggestTimer = null;
-var suggestPermissionGranted = {}; // 缓存已授权的搜索引擎
+var suggestPermissionGranted = {}; 
 
 function canonicalStringify(obj) {
   if (obj === null || typeof obj !== 'object') {
@@ -75,6 +100,34 @@ function canonicalStringify(obj) {
     return JSON.stringify(key) + ':' + canonicalStringify(obj[key]);
   });
   return '{' + parts.join(',') + '}';
+}
+
+function getIconUrls(url) {
+  try {
+    var u = new URL(url);
+    var domain = u.hostname;
+    var origin = u.origin;
+    return [
+      origin + '/favicon.ico',                                          
+      'https://www.google.com/s2/favicons?domain=' + domain + '&sz=64', 
+      'https://icons.duckduckgo.com/ip3/' + domain + '.ico',            
+      'https://favicon.yandex.net/favicon/' + domain                    
+    ];
+  } catch (e) { return []; }
+}
+
+function tryNextIcon(img) {
+  var urls = JSON.parse(img.dataset.iconUrls || '[]');
+  var index = parseInt(img.dataset.iconIndex || '0') + 1;
+  
+  if (index < urls.length) {
+    img.dataset.iconIndex = index;
+    img.src = urls[index];
+  } else {
+    img.style.display = 'none';
+    img.parentElement.classList.add('fallback');
+    img.parentElement.textContent = img.dataset.fallback || 'L';
+  }
 }
 
 function getIconUrl(url, size) {
@@ -92,52 +145,53 @@ function getDomainName(url) {
   } catch (e) { return 'Link'; }
 }
 
+// 修改后的 loadData，只负责后台同步检查，不负责初始加载
 function loadData() {
   if (typeof chrome !== 'undefined' && chrome.storage) {
     chrome.storage.local.get(['newtabData'], function(result) {
-      initData(result.newtabData);
+      if (result.newtabData) {
+        var remoteStr = JSON.stringify(result.newtabData);
+        var currentStr = JSON.stringify(data);
+        
+        // 只有当数据真的不一致时，才重新渲染
+        if (remoteStr !== currentStr) {
+            initData(result.newtabData, false);
+        }
+      }
     });
-  } else {
-    var saved = localStorage.getItem('newtabData');
-    initData(saved ? JSON.parse(saved) : null);
   }
 }
 
-function initData(loadedData) {
+function initData(loadedData, skipSync) {
   if (loadedData) {
     data = loadedData;
+    // 补全字段逻辑同上...
     if (typeof data.theme === 'undefined') data.theme = localStorage.getItem('theme') || 'light';
-    if (typeof data.opacityLight === 'undefined') data.opacityLight = localStorage.getItem('opacityLight') || 85;
-    if (typeof data.opacityDark === 'undefined') data.opacityDark = localStorage.getItem('opacityDark') || 85;
-    if (!data.webdav) {
-      var oldConfig = localStorage.getItem('webdavConfig');
-      if (oldConfig) {
-        try { data.webdav = JSON.parse(oldConfig); } catch(e) { data.webdav = { url:'', user:'', pass:'' }; }
-      } else {
-        data.webdav = { url:'', user:'', pass:'' };
-      }
-    }
+    if (typeof data.opacityLight === 'undefined') data.opacityLight = 85;
+    if (typeof data.opacityDark === 'undefined') data.opacityDark = 85;
+    if (!data.webdav) data.webdav = { url:'', user:'', pass:'' };
   } else {
-    data = defaultData;
-    var oldConfig = localStorage.getItem('webdavConfig');
-    if (oldConfig) { try { data.webdav = JSON.parse(oldConfig); } catch(e) {} }
+    data = JSON.parse(JSON.stringify(defaultData));
   }
-  if (!data.webdav) data.webdav = { url:'', user:'', pass:'' };
+  
   render();
-  setTimeout(checkCloudSync, 500);
+  saveData(); // 确保本地也是最新的
+  
+  if (!skipSync) {
+    setTimeout(checkCloudSync, 500);
+  }
 }
 
 function saveData() {
+  localStorage.setItem('newtabData', JSON.stringify(data));
+  localStorage.setItem('theme', data.theme);
+  
   if (typeof chrome !== 'undefined' && chrome.storage) {
     chrome.storage.local.set({ newtabData: data });
-  } else {
-    localStorage.setItem('newtabData', JSON.stringify(data));
   }
-  localStorage.setItem('theme', data.theme);
   autoSyncToWebdav();
 }
 
-// 从 URL 提取 origin 用于权限请求
 function getOriginPattern(url) {
   try {
     var u = new URL(url);
@@ -147,74 +201,41 @@ function getOriginPattern(url) {
   }
 }
 
-// 检查是否有指定 URL 的权限
 function checkHostPermission(callback, url) {
   if (typeof chrome === 'undefined' || !chrome.permissions) {
     callback(true);
     return;
   }
-  
   var targetUrl = url || (data.webdav && data.webdav.url);
-  if (!targetUrl) {
-    callback(false);
-    return;
-  }
-  
+  if (!targetUrl) { callback(false); return; }
   var origin = getOriginPattern(targetUrl);
-  if (!origin) {
-    callback(false);
-    return;
-  }
+  if (!origin) { callback(false); return; }
   
-  chrome.permissions.contains({
-    origins: [origin]
-  }, function(result) {
-    callback(result);
-  });
+  chrome.permissions.contains({ origins: [origin] }, function(result) { callback(result); });
 }
 
-// 请求指定 URL 的权限
 function requestHostPermission(callback, url) {
   if (typeof chrome === 'undefined' || !chrome.permissions) {
     callback(true);
     return;
   }
-  
   var targetUrl = url || (data.webdav && data.webdav.url);
-  if (!targetUrl) {
-    callback(false);
-    return;
-  }
-  
+  if (!targetUrl) { callback(false); return; }
   var origin = getOriginPattern(targetUrl);
-  if (!origin) {
-    callback(false);
-    return;
-  }
+  if (!origin) { callback(false); return; }
   
-  chrome.permissions.request({
-    origins: [origin]
-  }, function(granted) {
-    callback(granted);
-  });
+  chrome.permissions.request({ origins: [origin] }, function(granted) { callback(granted); });
 }
 
-// 自动同步函数
 function autoSyncToWebdav() {
   var cfg = data.webdav;
   if (!cfg || !cfg.url || !cfg.user) return;
-  
-  // 先检查权限
   checkHostPermission(function(hasPermission) {
-    if (!hasPermission) {
-      console.log('没有主机权限，跳过自动同步');
-      return;
-    }
+    if (!hasPermission) return;
     doWebdavSync();
   });
 }
 
-// 执行实际的 WebDAV 同步
 function doWebdavSync() {
   var cfg = data.webdav;
   var fileUrl = cfg.url.replace(/\/$/, '') + '/newtab-config.json';
@@ -231,27 +252,18 @@ function doWebdavSync() {
   })
   .then(function(response) {
     if (response.ok || response.status === 201 || response.status === 204) {
-      console.log('自动同步成功');
-      
       if(settingsBtn) {
         settingsBtn.style.color = '#27ae60';
         setTimeout(function() { settingsBtn.style.color = ''; }, 1500);
       }
-
       if (statusEl) {
         showWebdavStatus('同步成功 ✓', 'success');
-        setTimeout(function() { 
-          if(statusEl.textContent.includes('成功')) statusEl.textContent = ''; 
-        }, 3000);
+        setTimeout(function() { if(statusEl.textContent.includes('成功')) statusEl.textContent = ''; }, 3000);
       }
-
-    } else {
-        throw new Error('HTTP ' + response.status);
-    }
+    } else { throw new Error('HTTP ' + response.status); }
   })
   .catch(function(err) {
     console.error('自动同步失败', err);
-    
     if(settingsBtn) {
         settingsBtn.style.color = '#e74c3c';
         setTimeout(function() { settingsBtn.style.color = ''; }, 3000);
@@ -263,13 +275,9 @@ function doWebdavSync() {
 function checkCloudSync() {
   var cfg = data.webdav;
   if (!cfg || !cfg.url || !cfg.user) return;
-  
-  // 先检查权限
   checkHostPermission(function(hasPermission) {
     if (!hasPermission) return;
-    
     var fileUrl = cfg.url.replace(/\/$/, '') + '/newtab-config.json';
-    
     fetch(fileUrl, {
       method: 'GET',
       headers: { 'Authorization': 'Basic ' + btoa(cfg.user + ':' + cfg.pass) }
@@ -280,17 +288,11 @@ function checkCloudSync() {
     })
     .then(function(remoteData) {
       if (!remoteData || !remoteData.groups) return;
-      
       var localStr = canonicalStringify(data);
       var remoteStr = canonicalStringify(remoteData);
-      
-      if (localStr !== remoteStr) {
-        showSyncPrompt(remoteData);
-      }
+      if (localStr !== remoteStr) showSyncPrompt(remoteData);
     })
-    .catch(function(err) {
-      console.warn('检查同步出错:', err);
-    });
+    .catch(function(err) { console.warn('检查同步出错:', err); });
   });
 }
 
@@ -320,7 +322,6 @@ function applyRemoteData() {
 function keepLocalData() {
   window.pendingRemoteData = null;
   document.getElementById('syncModal').classList.remove('active');
-  console.log('保留本地，强制覆盖云端...');
   autoSyncToWebdav(); 
 }
 
@@ -397,11 +398,13 @@ function renderGroups() {
     html += '<div class="links-row" data-group-index="' + groupIndex + '">';
 
     group.links.forEach(function(link, linkIndex) {
-      var iconUrl = link.customIcon || getIconUrl(link.url);
+      var iconUrls = link.customIcon ? [link.customIcon] : getIconUrls(link.url);
+      var iconUrlsJson = JSON.stringify(iconUrls).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      var fallbackChar = link.name ? link.name[0] : 'L';
       html += '<a href="' + link.url + '" class="link-card" data-group="' + groupIndex + '" data-link="' + linkIndex + '">';
       html += '<div class="link-icon">';
-      if (iconUrl) {
-        html += '<img src="' + iconUrl + '" onerror="this.parentElement.classList.add(\'fallback\');this.style.display=\'none\';this.parentElement.textContent=\'' + (link.name ? link.name[0] : 'L') + '\'">';
+      if (iconUrls.length > 0) {
+        html += '<img src="' + iconUrls[0] + '" data-icon-urls="' + iconUrlsJson + '" data-icon-index="0" data-fallback="' + fallbackChar + '" class="link-icon-img">';
       } else {
         html += link.name[0];
       }
@@ -425,6 +428,9 @@ var isEditMode = false;
 var editingGroupIndex = null;
 
 function bindEvents() {
+  document.querySelectorAll('.link-icon-img').forEach(function(img) {
+    img.addEventListener('error', function() { tryNextIcon(this); });
+  });
   document.querySelectorAll('.add-link-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       currentGroupIndex = parseInt(this.getAttribute('data-group-index'));
@@ -480,9 +486,43 @@ function bindEvents() {
 
 function setupDragAndDrop(groupIndex) { var linksRow = document.querySelector('.links-row[data-group-index="' + groupIndex + '"]'); if (!linksRow) return; var linkCards = linksRow.querySelectorAll('.link-card'); linkCards.forEach(function(card) { card.setAttribute('draggable', 'true'); card.addEventListener('click', function(e) { if (editingGroupIndex !== null) { e.preventDefault(); } }); card.addEventListener('dragstart', function(e) { if (editingGroupIndex === null) { e.preventDefault(); return; } this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', JSON.stringify({ groupIndex: this.getAttribute('data-group'), linkIndex: this.getAttribute('data-link') })); }); card.addEventListener('dragend', function() { this.classList.remove('dragging'); document.querySelectorAll('.link-card').forEach(function(c) { c.classList.remove('drag-over'); }); }); card.addEventListener('dragover', function(e) { if (editingGroupIndex === null) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; this.classList.add('drag-over'); }); card.addEventListener('dragleave', function() { this.classList.remove('drag-over'); }); card.addEventListener('drop', function(e) { if (editingGroupIndex === null) return; e.preventDefault(); this.classList.remove('drag-over'); var sourceData = JSON.parse(e.dataTransfer.getData('text/plain')); var targetGroupIndex = parseInt(this.getAttribute('data-group')); var targetLinkIndex = parseInt(this.getAttribute('data-link')); var sourceGroupIndex = parseInt(sourceData.groupIndex); var sourceLinkIndex = parseInt(sourceData.linkIndex); if (sourceGroupIndex === targetGroupIndex && sourceLinkIndex === targetLinkIndex) { return; } if (sourceGroupIndex === targetGroupIndex) { var links = data.groups[sourceGroupIndex].links; var movedLink = links.splice(sourceLinkIndex, 1)[0]; links.splice(targetLinkIndex, 0, movedLink); saveData(); renderGroups(); } }); }); }
 function setupGroupDragAndDrop() { var groupSections = document.querySelectorAll('.group-section'); groupSections.forEach(function(section) { var header = section.querySelector('.group-header'); section.setAttribute('draggable', 'true'); section.addEventListener('dragstart', function(e) { if (editingGroupIndex === null) { e.preventDefault(); return; } if (!e.target.classList.contains('group-section')) return; this.classList.add('dragging-group'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/group', this.getAttribute('data-group-index')); }); section.addEventListener('dragend', function() { this.classList.remove('dragging-group'); document.querySelectorAll('.group-section').forEach(function(s) { s.classList.remove('drag-over-group'); }); }); section.addEventListener('dragover', function(e) { if (editingGroupIndex === null) return; if (e.dataTransfer.types.includes('application/group')) { e.preventDefault(); this.classList.add('drag-over-group'); } }); section.addEventListener('dragleave', function() { this.classList.remove('drag-over-group'); }); section.addEventListener('drop', function(e) { if (editingGroupIndex === null) return; if (!e.dataTransfer.types.includes('application/group')) return; e.preventDefault(); this.classList.remove('drag-over-group'); var sourceIndex = parseInt(e.dataTransfer.getData('application/group')); var targetIndex = parseInt(this.getAttribute('data-group-index')); if (sourceIndex === targetIndex) return; var movedGroup = data.groups.splice(sourceIndex, 1)[0]; data.groups.splice(targetIndex, 0, movedGroup); if (editingGroupIndex === sourceIndex) { editingGroupIndex = targetIndex; } else if (sourceIndex < editingGroupIndex && targetIndex >= editingGroupIndex) { editingGroupIndex--; } else if (sourceIndex > editingGroupIndex && targetIndex <= editingGroupIndex) { editingGroupIndex++; } saveData(); renderGroups(); }); }); }
-function setupUrlPreview(id1, id2, id3, id4) { var urlInput = document.getElementById(id1); var timer; urlInput.addEventListener('input', function() { clearTimeout(timer); var url = this.value.trim(); timer = setTimeout(function() { if (url && (url.startsWith('http') || url.includes('.'))) { if (!url.startsWith('http')) url = 'https://' + url; var iconUrl = getIconUrl(url); var domain = getDomainName(url); if (iconUrl) { document.getElementById(id3).src = iconUrl; document.getElementById(id4).textContent = domain; document.getElementById(id2).style.display = 'flex'; } } else { document.getElementById(id2).style.display = 'none'; } }, 300); }); }
-function openEditGroupModal(index) { currentGroupIndex = index; var group = data.groups[index]; document.getElementById('groupName').value = group.name; document.getElementById('groupIcon').value = group.icon; document.getElementById('groupModalTitle').textContent = '编辑分组'; document.getElementById('groupModal').classList.add('active'); }
+function setupUrlPreview(id1, id2, id3, id4) {
+  var urlInput = document.getElementById(id1);
+  var timer;
+  urlInput.addEventListener('input', function() {
+    clearTimeout(timer);
+    var url = this.value.trim();
+    timer = setTimeout(function() {
+      if (url && (url.startsWith('http') || url.includes('.'))) {
+        if (!url.startsWith('http')) url = 'https://' + url;
+        var iconUrls = getIconUrls(url);
+        var domain = getDomainName(url);
+        if (iconUrls.length > 0) {
+          var imgEl = document.getElementById(id3);
+          imgEl.dataset.iconUrls = JSON.stringify(iconUrls);
+          imgEl.dataset.iconIndex = '0';
+          imgEl.src = iconUrls[0];
+          imgEl.onerror = function() { tryNextIconPreview(this); };
+          document.getElementById(id4).textContent = domain;
+          document.getElementById(id2).style.display = 'flex';
+        }
+      } else {
+        document.getElementById(id2).style.display = 'none';
+      }
+    }, 300);
+  });
+}
 
+function tryNextIconPreview(img) {
+  var urls = JSON.parse(img.dataset.iconUrls || '[]');
+  var index = parseInt(img.dataset.iconIndex || '0') + 1;
+  if (index < urls.length) {
+    img.dataset.iconIndex = index;
+    img.src = urls[index];
+  } else { img.src = ''; }
+}
+
+function openEditGroupModal(index) { currentGroupIndex = index; var group = data.groups[index]; document.getElementById('groupName').value = group.name; document.getElementById('groupIcon').value = group.icon; document.getElementById('groupModalTitle').textContent = '编辑分组'; document.getElementById('groupModal').classList.add('active'); }
 function openLinkModal() { currentLinkIndex = null; document.getElementById('linkUrl').value = ''; document.getElementById('linkName').value = ''; document.getElementById('linkPreview').style.display = 'none'; document.getElementById('linkModalTitle').textContent = '添加链接'; customIconBase64 = null; document.getElementById('customIconStatus').textContent = '未选择'; document.getElementById('customIconPreview').style.display = 'none'; document.getElementById('linkModal').classList.add('active'); document.getElementById('linkUrl').focus(); }
 function openEditLinkModal(gIdx, lIdx) { currentGroupIndex = gIdx; currentLinkIndex = lIdx; var link = data.groups[gIdx].links[lIdx]; document.getElementById('linkUrl').value = link.url; document.getElementById('linkName').value = link.name; document.getElementById('linkModalTitle').textContent = '编辑链接'; var iconUrl = link.customIcon || getIconUrl(link.url); if (iconUrl) { document.getElementById('linkPreviewIcon').src = iconUrl; document.getElementById('linkPreviewDomain').textContent = getDomainName(link.url); document.getElementById('linkPreview').style.display = 'flex'; } if (link.customIcon) { customIconBase64 = link.customIcon; document.getElementById('customIconStatus').textContent = '已设置'; document.getElementById('customIconImg').src = link.customIcon; document.getElementById('customIconPreview').style.display = 'block'; } else { customIconBase64 = null; document.getElementById('customIconStatus').textContent = '未选择'; document.getElementById('customIconPreview').style.display = 'none'; } document.getElementById('linkModal').classList.add('active'); }
 function closeLinkModal() { document.getElementById('linkModal').classList.remove('active'); currentGroupIndex = null; }
@@ -492,76 +532,33 @@ function closeGroupModal() { document.getElementById('groupModal').classList.rem
 function saveGroup() { var name = document.getElementById('groupName').value.trim(); var icon = document.getElementById('groupIcon').value.trim() || '📁'; if (!name) return; if (currentGroupIndex !== null) { data.groups[currentGroupIndex].name = name; data.groups[currentGroupIndex].icon = icon; } else { data.groups.push({name:name, icon:icon, links:[]}); } saveData(); render(); closeGroupModal(); }
 function doSearch() { var q = document.getElementById('searchInput').value.trim(); if (!q) return; hideSuggestions(); window.location.href = searchEngines[data.searchEngine].url + encodeURIComponent(q); }
 
-// 搜索建议功能
 function checkSuggestPermission(engine, callback) {
-  if (typeof chrome === 'undefined' || !chrome.permissions) {
-    callback(true);
-    return;
-  }
-  
-  if (suggestPermissionGranted[engine]) {
-    callback(true);
-    return;
-  }
-  
+  if (typeof chrome === 'undefined' || !chrome.permissions) { callback(true); return; }
+  if (suggestPermissionGranted[engine]) { callback(true); return; }
   var api = suggestApis[engine];
-  if (!api) {
-    callback(false);
-    return;
-  }
-  
-  chrome.permissions.contains({
-    origins: [api.origin]
-  }, function(result) {
-    if (result) suggestPermissionGranted[engine] = true;
-    callback(result);
-  });
+  if (!api) { callback(false); return; }
+  chrome.permissions.contains({ origins: [api.origin] }, function(result) { if (result) suggestPermissionGranted[engine] = true; callback(result); });
 }
 
 function requestSuggestPermission(engine, callback) {
-  if (typeof chrome === 'undefined' || !chrome.permissions) {
-    callback(true);
-    return;
-  }
-  
+  if (typeof chrome === 'undefined' || !chrome.permissions) { callback(true); return; }
   var api = suggestApis[engine];
-  if (!api) {
-    callback(false);
-    return;
-  }
-  
-  chrome.permissions.request({
-    origins: [api.origin]
-  }, function(granted) {
-    if (granted) suggestPermissionGranted[engine] = true;
-    callback(granted);
-  });
+  if (!api) { callback(false); return; }
+  chrome.permissions.request({ origins: [api.origin] }, function(granted) { if (granted) suggestPermissionGranted[engine] = true; callback(granted); });
 }
 
 function fetchSuggestions(query, engine) {
   var api = suggestApis[engine];
-  if (!api || !query.trim()) {
-    hideSuggestions();
-    return;
-  }
-  
+  if (!api || !query.trim()) { hideSuggestions(); return; }
   checkSuggestPermission(engine, function(hasPermission) {
     if (!hasPermission) {
-      // 没有权限，首次输入时请求
-      requestSuggestPermission(engine, function(granted) {
-        if (granted) {
-          doFetchSuggestions(query, engine, api);
-        }
-      });
-    } else {
-      doFetchSuggestions(query, engine, api);
-    }
+      requestSuggestPermission(engine, function(granted) { if (granted) doFetchSuggestions(query, engine, api); });
+    } else { doFetchSuggestions(query, engine, api); }
   });
 }
 
 function doFetchSuggestions(query, engine, api) {
   if (api.encoding === 'gbk') {
-    // 百度 GBK 编码，用 ArrayBuffer 解码
     fetch(api.url + encodeURIComponent(query))
       .then(function(r) { return r.arrayBuffer(); })
       .then(function(buffer) {
@@ -571,10 +568,7 @@ function doFetchSuggestions(query, engine, api) {
         var suggestions = api.parse(data);
         showSuggestions(suggestions.slice(0, 8));
       })
-      .catch(function(err) {
-        console.warn('获取搜索建议失败:', err);
-        hideSuggestions();
-      });
+      .catch(function(err) { hideSuggestions(); });
   } else {
     fetch(api.url + encodeURIComponent(query))
       .then(function(r) { return r.json(); })
@@ -582,29 +576,17 @@ function doFetchSuggestions(query, engine, api) {
         var suggestions = api.parse(data);
         showSuggestions(suggestions.slice(0, 8));
       })
-      .catch(function(err) {
-        console.warn('获取搜索建议失败:', err);
-        hideSuggestions();
-      });
+      .catch(function(err) { hideSuggestions(); });
   }
 }
 
 function showSuggestions(suggestions) {
   var container = document.getElementById('suggestionsContainer');
-  if (!container || !suggestions || suggestions.length === 0) {
-    hideSuggestions();
-    return;
-  }
-  
+  if (!container || !suggestions || suggestions.length === 0) { hideSuggestions(); return; }
   var html = '';
-  suggestions.forEach(function(s) {
-    html += '<div class="suggestion-item">' + escapeHtml(s) + '</div>';
-  });
-  
+  suggestions.forEach(function(s) { html += '<div class="suggestion-item">' + escapeHtml(s) + '</div>'; });
   container.innerHTML = html;
   container.style.display = 'block';
-  
-  // 绑定点击事件
   container.querySelectorAll('.suggestion-item').forEach(function(item) {
     item.addEventListener('click', function() {
       document.getElementById('searchInput').value = this.textContent;
@@ -616,47 +598,25 @@ function showSuggestions(suggestions) {
 
 function hideSuggestions() {
   var container = document.getElementById('suggestionsContainer');
-  if (container) {
-    container.style.display = 'none';
-    container.innerHTML = '';
-  }
+  if (container) { container.style.display = 'none'; container.innerHTML = ''; }
 }
 
-function escapeHtml(text) {
-  var div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
+function escapeHtml(text) { var div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 
 function setupSearchSuggestions() {
   var input = document.getElementById('searchInput');
-  
   input.addEventListener('input', function() {
     var query = this.value.trim();
-    
     clearTimeout(suggestTimer);
-    
-    if (!query) {
-      hideSuggestions();
-      return;
-    }
-    
-    // 防抖，300ms 后请求
-    suggestTimer = setTimeout(function() {
-      fetchSuggestions(query, data.searchEngine);
-    }, 300);
+    if (!query) { hideSuggestions(); return; }
+    suggestTimer = setTimeout(function() { fetchSuggestions(query, data.searchEngine); }, 300);
   });
-  
   input.addEventListener('keydown', function(e) {
     var container = document.getElementById('suggestionsContainer');
     var items = container ? container.querySelectorAll('.suggestion-item') : [];
     var activeItem = container ? container.querySelector('.suggestion-item.active') : null;
     var activeIndex = -1;
-    
-    items.forEach(function(item, i) {
-      if (item.classList.contains('active')) activeIndex = i;
-    });
-    
+    items.forEach(function(item, i) { if (item.classList.contains('active')) activeIndex = i; });
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (items.length > 0) {
@@ -673,31 +633,16 @@ function setupSearchSuggestions() {
         items[activeIndex].classList.add('active');
         input.value = items[activeIndex].textContent;
       }
-    } else if (e.key === 'Escape') {
-      hideSuggestions();
-    }
+    } else if (e.key === 'Escape') { hideSuggestions(); }
   });
-  
-  // 点击外部关闭建议
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('.search-box')) {
-      hideSuggestions();
-    }
-  });
+  document.addEventListener('click', function(e) { if (!e.target.closest('.search-box')) hideSuggestions(); });
 }
 
-// WebDAV 保存配置 - 带权限请求
 function saveWebdavConfig() {
   var url = document.getElementById('webdavUrl').value.trim();
   var user = document.getElementById('webdavUser').value.trim();
   var pass = document.getElementById('webdavPass').value;
-  
-  if (!url) {
-    showWebdavStatus('请填写服务器地址', 'error');
-    return;
-  }
-  
-  // 请求该 WebDAV 服务器的权限
+  if (!url) { showWebdavStatus('请填写服务器地址', 'error'); return; }
   requestHostPermission(function(granted) {
     if (granted) {
       data.webdav.url = url;
@@ -705,9 +650,7 @@ function saveWebdavConfig() {
       data.webdav.pass = pass;
       showWebdavStatus('配置已保存，正在同步...', 'info');
       saveData();
-    } else {
-      showWebdavStatus('需要授权才能访问该服务器', 'error');
-    }
+    } else { showWebdavStatus('需要授权才能访问该服务器', 'error'); }
   }, url);
 }
 
@@ -720,40 +663,26 @@ function showWebdavStatus(msg, type) {
 function webdavUpload() {
   var cfg = data.webdav;
   if (!cfg.url) { showWebdavStatus('请先保存 WebDAV 设置', 'error'); return; }
-  
   checkHostPermission(function(hasPermission) {
     if (!hasPermission) {
       requestHostPermission(function(granted) {
-        if (granted) {
-          showWebdavStatus('上传中...', 'info');
-          doWebdavSync();
-        } else {
-          showWebdavStatus('需要授权才能同步', 'error');
-        }
+        if (granted) { showWebdavStatus('上传中...', 'info'); doWebdavSync(); }
+        else { showWebdavStatus('需要授权才能同步', 'error'); }
       });
-    } else {
-      showWebdavStatus('上传中...', 'info');
-      doWebdavSync();
-    }
+    } else { showWebdavStatus('上传中...', 'info'); doWebdavSync(); }
   });
 }
 
 function webdavDownload() {
   var cfg = data.webdav;
   if (!cfg.url) { showWebdavStatus('请先保存 WebDAV 设置', 'error'); return; }
-  
   checkHostPermission(function(hasPermission) {
     if (!hasPermission) {
       requestHostPermission(function(granted) {
-        if (granted) {
-          doWebdavDownload();
-        } else {
-          showWebdavStatus('需要授权才能同步', 'error');
-        }
+        if (granted) doWebdavDownload();
+        else showWebdavStatus('需要授权才能同步', 'error');
       });
-    } else {
-      doWebdavDownload();
-    }
+    } else { doWebdavDownload(); }
   });
 }
 
@@ -767,12 +696,8 @@ function doWebdavDownload() {
   }).then(r => { if(!r.ok) throw new Error(r.status); return r.json(); })
     .then(d => {
        if(d.groups) { 
-         if((!d.webdav || !d.webdav.url) && data.webdav && data.webdav.url) {
-            d.webdav = data.webdav;
-         }
-         initData(d); 
-         saveData(); 
-         showWebdavStatus('下载成功 ✓', 'success'); 
+         if((!d.webdav || !d.webdav.url) && data.webdav && data.webdav.url) { d.webdav = data.webdav; }
+         initData(d); saveData(); showWebdavStatus('下载成功 ✓', 'success'); 
        }
     }).catch(e => showWebdavStatus('失败: ' + e.message, 'error'));
 }
@@ -797,12 +722,8 @@ function handleImport(e) {
     try {
       var imported = JSON.parse(e.target.result);
       if (imported.groups) {
-        if((!imported.webdav || !imported.webdav.url) && data.webdav && data.webdav.url) {
-            imported.webdav = data.webdav;
-        }
-        initData(imported);
-        saveData();
-        alert('导入成功');
+        if((!imported.webdav || !imported.webdav.url) && data.webdav && data.webdav.url) imported.webdav = data.webdav;
+        initData(imported); saveData(); alert('导入成功');
       }
     } catch (err) { alert('导入失败'); }
   };
@@ -810,6 +731,10 @@ function handleImport(e) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+  // 1. 立即渲染（因为数据在上面已经同步读取了）
+  render();
+
+  // 2. 绑定事件
   setupUrlPreview('linkUrl', 'linkPreview', 'linkPreviewIcon', 'linkPreviewDomain');
   setupSearchSuggestions();
 
@@ -903,5 +828,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
+  // 3. 延时检查云端同步，避免阻塞首屏
+  setTimeout(checkCloudSync, 500);
+  
+  // 4. 后台静默检查 storage 更新（兜底）
   loadData();
 });

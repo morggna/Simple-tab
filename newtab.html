@@ -4,10 +4,35 @@
   <meta charset="UTF-8">
   <title>New Tab</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%236b7280' d='M18.6 6.62c-1.44 0-2.8.56-3.77 1.53L7.8 14.39c-.64.64-1.49.99-2.4.99C3.53 15.38 2 13.87 2 12s1.53-3.38 3.4-3.38c.91 0 1.76.35 2.44 1.03l1.13 1l1.53-1.34L9.22 8.2A5.37 5.37 0 0 0 5.4 6.62C2.42 6.62 0 9.04 0 12s2.42 5.38 5.4 5.38c1.44 0 2.8-.56 3.77-1.53l7.03-6.24c.64-.64 1.49-.99 2.4-.99c1.87 0 3.4 1.51 3.4 3.38s-1.53 3.38-3.4 3.38c-.9 0-1.76-.35-2.44-1.03L15 13.34l-1.5 1.34l1.28 1.12a5.4 5.4 0 0 0 3.82 1.58c2.98 0 5.4-2.42 5.4-5.38s-2.42-5.38-5.4-5.38'/></svg>">
+  
+  <script>
+    (function() {
+      try {
+        var localData = localStorage.getItem('newtabData');
+        var theme = localStorage.getItem('theme') || 'light';
+        var opL = 0.85, opD = 0.85;
+        
+        if (localData) {
+          var d = JSON.parse(localData);
+          if (d.theme) theme = d.theme;
+          if (typeof d.opacityLight !== 'undefined') opL = d.opacityLight / 100;
+          if (typeof d.opacityDark !== 'undefined') opD = d.opacityDark / 100;
+        }
+
+        if (theme === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+        document.documentElement.style.setProperty('--opacity-light', opL);
+        document.documentElement.style.setProperty('--opacity-dark', opD);
+      } catch (e) {}
+    })();
+  </script>
+
+  <script src="main.js"></script>
+  
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
-    /* 默认跟随系统主题 */
     html {
       background: #e8e4dc;
     }
@@ -695,7 +720,6 @@
   <button class="theme-toggle" id="themeToggle" title="切换暗黑模式">🌙</button>
   <button class="settings-btn" id="settingsBtn">⚙️</button>
 
-  <!-- 搜索框 -->
   <div class="search-box">
     <div class="search-engines">
       <img class="search-engine active" data-engine="google" src="https://www.google.com/favicon.ico" alt="Google" title="Google">
@@ -706,17 +730,13 @@
     <button class="search-btn" id="searchBtn">
       <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
     </button>
-    <!-- 搜索建议容器 -->
     <div class="suggestions-container" id="suggestionsContainer"></div>
   </div>
 
-  <!-- 分组容器 -->
   <div id="groupsContainer"></div>
 
-  <!-- 添加分组按钮 -->
   <button class="add-group-btn" id="addGroupBtn">+ 添加分组</button>
 
-  <!-- 添加链接弹窗 -->
   <div class="modal" id="linkModal">
     <div class="modal-content">
       <div class="modal-header">
@@ -753,7 +773,6 @@
     </div>
   </div>
 
-  <!-- 添加分组弹窗 -->
   <div class="modal" id="groupModal">
     <div class="modal-content">
       <div class="modal-header">
@@ -775,7 +794,6 @@
     </div>
   </div>
 
-  <!-- 设置弹窗 -->
   <div class="modal" id="settingsModal">
     <div class="modal-content">
       <div class="modal-header">
@@ -836,7 +854,6 @@
     </div>
   </div>
 
-  <!-- 同步提示弹窗 -->
   <div class="modal" id="syncModal">
     <div class="modal-content" style="max-width:320px;">
       <div class="modal-header">
@@ -853,7 +870,5 @@
   </div>
 
   <input type="file" id="importFile" accept=".json" style="display:none">
-
-  <script src="main.js"></script>
 </body>
 </html>
