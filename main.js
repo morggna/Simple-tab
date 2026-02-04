@@ -94,7 +94,7 @@ function getDomainName(url) {
 
 function loadData() {
   if (typeof chrome !== 'undefined' && chrome.storage) {
-    chrome.storage.sync.get(['newtabData'], function(result) {
+    chrome.storage.local.get(['newtabData'], function(result) {
       initData(result.newtabData);
     });
   } else {
@@ -129,7 +129,7 @@ function initData(loadedData) {
 
 function saveData() {
   if (typeof chrome !== 'undefined' && chrome.storage) {
-    chrome.storage.sync.set({ newtabData: data });
+    chrome.storage.local.set({ newtabData: data });
   } else {
     localStorage.setItem('newtabData', JSON.stringify(data));
   }
