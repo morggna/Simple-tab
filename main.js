@@ -107,13 +107,22 @@ function getIconUrls(url) {
     var u = new URL(url);
     var domain = u.hostname;
     var origin = u.origin;
-    return [
-      origin + '/favicon.ico',                                          
+    var urls = [
       'https://www.google.com/s2/favicons?domain=' + domain + '&sz=64', 
       'https://icons.duckduckgo.com/ip3/' + domain + '.ico',            
       'https://favicon.yandex.net/favicon/' + domain                    
     ];
+
+    if (!isCloudflareDomain(domain)) {
+      urls.unshift(origin + '/favicon.ico');
+    }
+
+    return urls;
   } catch (e) { return []; }
+}
+
+function isCloudflareDomain(domain) {
+  return domain === 'cloudflare.com' || domain.endsWith('.cloudflare.com');
 }
 
 function tryNextIcon(img) {
