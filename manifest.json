@@ -5,7 +5,8 @@
   "description": "极简导航 - 快速访问",
   "permissions": [
     "storage",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "favicon"
   ],
   "optional_host_permissions": [
     "https://suggestqueries.google.com/*",

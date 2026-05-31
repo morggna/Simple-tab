@@ -106,23 +106,34 @@ function getIconUrls(url) {
   try {
     var u = new URL(url);
     var domain = u.hostname;
-    var origin = u.origin;
-    var urls = [
+    var urls = [];
+    var cachedFavicon = getChromeFaviconUrl(u.href, 64);
+
+    if (cachedFavicon) {
+      urls.push(cachedFavicon);
+    }
+
+    return urls.concat([
       'https://www.google.com/s2/favicons?domain=' + domain + '&sz=64', 
       'https://icons.duckduckgo.com/ip3/' + domain + '.ico',            
       'https://favicon.yandex.net/favicon/' + domain                    
-    ];
-
-    if (!isCloudflareDomain(domain)) {
-      urls.unshift(origin + '/favicon.ico');
-    }
-
-    return urls;
+    ]);
   } catch (e) { return []; }
 }
 
-function isCloudflareDomain(domain) {
-  return domain === 'cloudflare.com' || domain.endsWith('.cloudflare.com');
+function getChromeFaviconUrl(pageUrl, size) {
+  try {
+    if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.getURL) {
+      return null;
+    }
+
+    var faviconUrl = new URL(chrome.runtime.getURL('/_favicon/'));
+    faviconUrl.searchParams.set('pageUrl', pageUrl);
+    faviconUrl.searchParams.set('size', String(size || 64));
+    return faviconUrl.toString();
+  } catch (e) {
+    return null;
+  }
 }
 
 function tryNextIcon(img) {
@@ -141,6 +152,9 @@ function tryNextIcon(img) {
 
 function getIconUrl(url, size) {
   try {
+    var cachedFavicon = getChromeFaviconUrl(url, size || 64);
+    if (cachedFavicon) return cachedFavicon;
+
     var domain = new URL(url).hostname;
     return 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=' + (size || 64);
   } catch (e) { return null; }
@@ -378,6 +392,11 @@ function renderSearchEngine() {
   var engines = document.querySelectorAll('.search-engine');
   engines.forEach(function(el) {
     var engine = el.getAttribute('data-engine');
+    var iconUrl = el.getAttribute('data-icon-url');
+    if (iconUrl && !el.src) {
+      el.src = getIconUrl(iconUrl, 32) || '';
+    }
+
     if (engine === data.searchEngine) el.classList.add('active');
     else el.classList.remove('active');
   });
@@ -413,7 +432,7 @@ function renderGroups() {
       html += '<a href="' + link.url + '" class="link-card" data-group="' + groupIndex + '" data-link="' + linkIndex + '">';
       html += '<div class="link-icon">';
       if (iconUrls.length > 0) {
-        html += '<img src="' + iconUrls[0] + '" data-icon-urls="' + iconUrlsJson + '" data-icon-index="0" data-fallback="' + fallbackChar + '" class="link-icon-img">';
+        html += '<img src="' + iconUrls[0] + '" data-icon-urls="' + iconUrlsJson + '" data-icon-index="0" data-fallback="' + fallbackChar + '" class="link-icon-img" loading="lazy" decoding="async">';
       } else {
         html += link.name[0];
       }
