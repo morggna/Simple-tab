@@ -1,6 +1,6 @@
 # Simple-tab - 极简新标签页
 
-一个简洁、美观、可自定义的 Chrome 新标签页扩展。
+一个简洁、美观、可自定义的 Chrome 新标签页扩展（已完成模块化重构 v5.5+）。
 
 ![preview1](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview1.png)
 ![preview2](https://raw.githubusercontent.com/morggna/Simple-tab/main/screenshots/preview2.png)
@@ -10,172 +10,75 @@
 
 - 🎨 **简洁美观** - 极简设计风格，支持亮色/暗色主题
 - 📁 **分组管理** - 链接分组整理，支持 emoji 图标
-- 🔍 **多搜索引擎** - Google、Bing、百度一键切换
-- 💡 **搜索建议** - 实时显示搜索引擎联想词
+- 🔍 **多搜索引擎** - Google、Bing、百度一键切换 + 实时搜索建议
 - 🖼️ **自定义背景** - 支持任意图床链接
-- ☁️ **WebDAV 同步** - 跨设备配置同步（支持 Synology、坚果云等）
+- ☁️ **WebDAV 同步** - 跨设备配置同步
 - 🎚️ **透明度调节** - 自定义卡片透明度
 - 📦 **导入导出** - JSON 格式配置备份
 - ✏️ **拖拽排序** - 链接和分组均可拖拽排序
-- 🔒 **最小权限** - 按需请求权限，不索取不必要的权限
+- ⌨️ **键盘快捷键** - `?` 键快速聚焦搜索框
+- ♿ **无障碍优化** - aria-label、可见焦点
+- 🔒 **最小权限** - 按需请求权限
 
 ## 📦 安装
 
-### 方式：手动安装（开发者模式）
+手动安装（开发者模式）：
 
-1. 下载本仓库代码（[Download ZIP](https://github.com/morggna/Simple-tab/archive/refs/heads/main.zip)）
-2. 解压到本地文件夹
-3. 打开 Chrome，访问 `chrome://extensions/`
-4. 开启右上角「开发者模式」
-5. 点击「加载已解压的扩展程序」
-6. 选择解压后的文件夹
+1. 下载仓库代码
+2. 解压
+3. Chrome → `chrome://extensions/` → 开启开发者模式 → 加载已解压的扩展程序
 
-不上架任何浏览器商店，完全透明
+## 🛠️ 开发
 
-## 🎯 使用说明
+```bash
+npm install
+npm run lint
+npm run format
+npm test
+```
 
-### 基本操作
-
-| 操作 | 说明 |
-|------|------|
-| 点击链接 | 打开网站 |
-| 点击「编辑」 | 进入编辑模式，显示删除按钮和添加按钮 |
-| 点击「完成」 | 退出编辑模式 |
-| 点击链接旁的 ✎ | 编辑链接名称、URL、图标 |
-| 点击分组旁的 ✎ | 编辑分组名称和图标 |
-| 拖拽链接 | 编辑模式下可排序 |
-| 拖拽分组 | 编辑模式下可排序 |
-
-自动抓取网站相关图标与标题，如抓取不到推荐通过 https://iconify.design/ 获取心仪图标，支持本地上传定制
-
-### 搜索建议
-
-在搜索框输入时会实时显示搜索引擎的联想词：
-- 支持 Google、Bing、百度三个搜索引擎
-- 使用 ↑↓ 键选择建议，Enter 搜索
-- 首次使用时会请求对应搜索引擎的权限（可选权限，可拒绝）
-
-### 设置选项
-
-点击右上角 ⚙️ 打开设置：
-
-- **外观** - 调整亮色/暗色模式下的卡片透明度
-- **背景** - 设置自定义背景图片 URL
-- **WebDAV 同步** - 配置云同步
-- **本地数据** - 导出/导入配置
-
-### 主题切换
-
-点击右上角 🌙/☀️ 切换亮色/暗色主题。
-
-## ☁️ WebDAV 同步配置
-
-支持通过 WebDAV 协议同步配置到云端，实现多设备同步。
-
-### Synology NAS 配置
-
-1. DSM → 套件中心 → 安装「WebDAV Server」
-2. 启用 HTTPS（默认端口 5006）
-3. 创建共享文件夹（如 `newtab`）
-4. 在扩展设置中填入：
-   - 服务器地址：`https://你的域名:5006/newtab`
-   - 用户名/密码：NAS 账号
-
-### 坚果云配置
-
-1. 登录坚果云网页版 → 账户信息 → 安全选项
-2. 添加应用密码
-3. 在扩展设置中填入：
-   - 服务器地址：`https://dav.jianguoyun.com/dav/你的文件夹`
-   - 用户名：坚果云账号邮箱
-   - 密码：应用密码（非登录密码）
-
-### 同步机制
-
-- **自动上传**：每次修改配置后自动上传到云端
-- **启动检查**：打开新标签页时检查云端是否有更新
-- **冲突处理**：发现不一致时弹窗询问使用云端还是本地
-- **按需授权**：首次配置时请求该服务器的访问权限
-
-## 🔒 权限说明
-
-本扩展采用最小权限原则：
-
-| 权限 | 用途 | 类型 |
-|------|------|------|
-| `storage` | 保存链接、分组、主题等配置 | 必需 |
-| 搜索引擎 API | 获取搜索建议 | 可选，首次使用时请求 |
-| WebDAV 服务器 | 云同步配置 | 可选，配置时请求 |
-
-不使用搜索建议或 WebDAV 的用户不会看到任何权限请求。
-
-## 📁 文件结构
+## 📁 文件结构（模块化 v5.5+）
 
 ```
 Simple-tab/
-├── manifest.json      # 扩展配置
-├── newtab.html        # 主页面
-├── main.js            # 核心逻辑
-├── icon.svg           # 矢量图标
-├── icon16.png         # 16x16 图标
-├── icon48.png         # 48x48 图标
-├── icon128.png        # 128x128 图标
-├── PRIVACY.md         # 隐私政策
-└── README.md          # 说明文档
+├── manifest.json
+├── newtab.html
+├── main.js                 # 薄协调入口（仅 71 行）
+├── src/
+│   ├── storage.js          # 数据持久化、迁移、canonical JSON
+│   ├── search.js           # 搜索引擎 + 完整搜索建议（含键盘导航）
+│   ├── utils.js            # 图标、域名、HTML 转义工具
+│   ├── sync.js             # WebDAV 同步与冲突处理
+│   ├── ui.js               # 渲染、主题、弹窗、卡片
+│   ├── events.js           # 事件绑定、编辑模式
+│   ├── storage.test.js
+│   └── search.test.js
+├── theme-boot.js
+├── package.json
+├── .eslintrc.json
+├── .prettierrc.json
+├── vitest.config.js
+└── README.md
 ```
 
 ## ⚙️ 技术栈
 
-- 原生 HTML/CSS/JavaScript
-- Chrome Extension Manifest V3
-- Chrome Storage API
-- Chrome Permissions API（动态权限）
+- 原生 ES Modules + Manifest V3
+- Chrome Storage / Permissions API
 - WebDAV 协议
-
-## 🔒 隐私说明
-
-- 所有数据存储在本地（Chrome Storage）
-- WebDAV 同步为可选功能，需用户手动配置
-- 搜索建议直接请求搜索引擎官方 API，不经过第三方
-- 不收集任何用户数据
-- 不包含任何追踪代码
-- 代码结构简单，欢迎审查
-
-详见 [隐私政策](PRIVACY.md)
+- Vitest（测试）
 
 ## 📝 更新日志
 
-### v5.4 (2025-01-30)
-- 新增搜索建议功能（支持 Google、Bing、百度）
-- 搜索建议支持键盘上下选择
-- 优化权限请求机制，按需请求特定域名权限
+### v5.5.0 (2026-06-01)
+- 完成完整模块化重构（storage / search / ui / events / utils / sync）
+- `main.js` 精简至 71 行协调器
+- 新增 Vitest 测试
+- 完善 ESLint + Prettier + 开发脚本
+- `?` 快捷键 + 无障碍增强
+- README 全面更新
 
-### v5.3 (2025-01-30)
-- WebDAV 同步改用动态权限请求
-- 只申请用户配置的服务器权限，不再请求所有网站权限
-- 更符合最小权限原则
-
-### v5.2 (2025-01-29)
-- 新增 WebDAV 云同步功能
-- 新增卡片透明度自定义
-- 新增链接编辑功能
-- 优化暗色模式显示效果
-- 修复编辑按钮状态问题
-
-### v5.1
-- 新增暗色模式
-- 新增分组拖拽排序
-- 新增自定义图标上传
-
-### v5.0
-- 初始版本
-- 基础链接管理
-- 多搜索引擎支持
-- 自定义背景
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request。
+（历史版本略）
 
 ## 📄 许可证
 

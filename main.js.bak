@@ -105,14 +105,7 @@ function canonicalStringify(obj) {
 function getIconUrls(url) {
   try {
     var u = new URL(url);
-        var domain = u.hostname;
-
-    // Baidu 特殊处理：直接使用百度官方 favicon
-    if (domain.includes("baidu.com")) {
-      var baiduIcon = getChromeFaviconUrl(u.href, 64);
-      return baiduIcon ? [baiduIcon, "https://www.baidu.com/favicon.ico"] : ["https://www.baidu.com/favicon.ico"];
-    }
-
+    var domain = u.hostname;
     var urls = [];
     var cachedFavicon = getChromeFaviconUrl(u.href, 64);
 
