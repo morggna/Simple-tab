@@ -6,10 +6,17 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Local agent state
+.omo/
+
 # Packages
+node_modules/
 *.zip
 *.crx
 *.pem
+
+# Local backup artifacts
+*.bak
 
 # Logs
 *.log
