@@ -31,7 +31,7 @@ export function getIconUrls(url) {
       `https://icons.duckduckgo.com/ip3/${domain}.ico`,
       `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
       `https://icon.horse/icon/${domain}`,
-      getChromeFaviconUrl(u.href, 64)
+      getChromeFaviconUrl(u.href, 64),
     ].filter(Boolean);
   } catch {
     return [];
@@ -47,7 +47,7 @@ export function tryNextIcon(img, urls, index = 0) {
   img.src = urls[index];
 }
 
-export function getIconUrl(url, size = 32) {
+export function getIconUrl(url, _size = 32) {
   return getIconUrls(url)[0];
 }
 

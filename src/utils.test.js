@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { getDomainName, getIconUrls, canonicalStringify } from './utils.js';
+import { getDomainName, getIconUrls } from './utils.js';
+import { canonicalStringify } from './storage.js';
 
 describe('utils', () => {
   it('getDomainName extracts hostname correctly', () => {
@@ -9,7 +10,7 @@ describe('utils', () => {
 
   it('getIconUrls returns Baidu special favicon', () => {
     const urls = getIconUrls('https://www.baidu.com');
-    expect(urls.some(u => u.includes('baidu.com/favicon.ico'))).toBe(true);
+    expect(urls.some((u) => u.includes('baidu.com/favicon.ico'))).toBe(true);
   });
 
   it('canonicalStringify is stable for different key orders', () => {

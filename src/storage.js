@@ -9,24 +9,24 @@ export const defaultData = {
       icon: '💻',
       links: [
         { name: 'Github', url: 'https://github.com' },
-        { name: 'Stack Overflow', url: 'https://stackoverflow.com' }
-      ]
+        { name: 'Stack Overflow', url: 'https://stackoverflow.com' },
+      ],
     },
     {
       name: '常用网站',
       icon: '⭐',
       links: [
         { name: 'YouTube', url: 'https://youtube.com' },
-        { name: 'Bilibili', url: 'https://www.bilibili.com' }
-      ]
-    }
+        { name: 'Bilibili', url: 'https://www.bilibili.com' },
+      ],
+    },
   ],
   searchEngine: 'google',
   bgUrl: '',
   theme: 'light',
   opacityLight: 85,
   opacityDark: 85,
-  webdav: { url: '', user: '', pass: '' }
+  webdav: { url: '', user: '', pass: '' },
 };
 
 export function canonicalStringify(obj) {
@@ -37,7 +37,7 @@ export function canonicalStringify(obj) {
     return '[' + obj.map(canonicalStringify).join(',') + ']';
   }
   const keys = Object.keys(obj).sort();
-  const parts = keys.map(key => JSON.stringify(key) + ':' + canonicalStringify(obj[key]));
+  const parts = keys.map((key) => JSON.stringify(key) + ':' + canonicalStringify(obj[key]));
   return '{' + parts.join(',') + '}';
 }
 
@@ -48,7 +48,9 @@ export function loadData() {
     if (cachedStr) {
       data = JSON.parse(cachedStr);
     }
-  } catch (e) {}
+  } catch {
+    // Ignore corrupt cached newtabData; fall back to defaults below.
+  }
 
   if (!data) {
     data = JSON.parse(JSON.stringify(defaultData));

@@ -7,31 +7,31 @@ import { escapeHtml } from './utils.js';
 export const searchEngines = {
   google: { name: 'Google', url: 'https://www.google.com/search?q=' },
   bing: { name: 'Bing', url: 'https://www.bing.com/search?q=' },
-  baidu: { name: '百度', url: 'https://www.baidu.com/s?wd=' }
+  baidu: { name: '百度', url: 'https://www.baidu.com/s?wd=' },
 };
 
 export const suggestApis = {
   google: {
     url: 'https://suggestqueries.google.com/complete/search?client=chrome&q=',
     origin: 'https://suggestqueries.google.com/*',
-    parse: data => data[1] || [],
-    encoding: 'utf-8'
+    parse: (data) => data[1] || [],
+    encoding: 'utf-8',
   },
   bing: {
     url: 'https://api.bing.com/osjson.aspx?query=',
     origin: 'https://api.bing.com/*',
-    parse: data => data[1] || [],
-    encoding: 'utf-8'
+    parse: (data) => data[1] || [],
+    encoding: 'utf-8',
   },
   baidu: {
     url: 'https://suggestion.baidu.com/su?action=opensearch&wd=',
     origin: 'https://suggestion.baidu.com/*',
-    parse: data => data[1] || [],
-    encoding: 'gbk'
-  }
+    parse: (data) => data[1] || [],
+    encoding: 'gbk',
+  },
 };
 
-let suggestPermissionGranted = {};
+const suggestPermissionGranted = {};
 let currentSuggestIndex = -1;
 let currentSuggestions = [];
 
@@ -50,7 +50,7 @@ export function checkHostPermission(callback, url) {
     return;
   }
   const pattern = getOriginPattern(url);
-  chrome.permissions.contains({ origins: [pattern] }, granted => callback(granted));
+  chrome.permissions.contains({ origins: [pattern] }, (granted) => callback(granted));
 }
 
 export function requestHostPermission(callback, url) {
@@ -59,7 +59,7 @@ export function requestHostPermission(callback, url) {
     return;
   }
   const pattern = getOriginPattern(url);
-  chrome.permissions.request({ origins: [pattern] }, granted => callback(granted));
+  chrome.permissions.request({ origins: [pattern] }, (granted) => callback(granted));
 }
 
 export function checkSuggestPermission(engine, callback) {
@@ -68,7 +68,7 @@ export function checkSuggestPermission(engine, callback) {
     return;
   }
   const api = suggestApis[engine];
-  checkHostPermission(granted => {
+  checkHostPermission((granted) => {
     suggestPermissionGranted[engine] = granted;
     callback(granted);
   }, api.origin);
@@ -80,7 +80,7 @@ export function requestSuggestPermission(engine, callback) {
     return;
   }
   const api = suggestApis[engine];
-  requestHostPermission(granted => {
+  requestHostPermission((granted) => {
     suggestPermissionGranted[engine] = granted;
     callback(granted);
   }, api.origin);
@@ -90,21 +90,21 @@ export function fetchSuggestions(query, engine) {
   if (!suggestApis[engine]) return;
   const api = suggestApis[engine];
 
-  checkSuggestPermission(engine, granted => {
+  checkSuggestPermission(engine, (granted) => {
     if (!granted) return;
 
     const url = api.url + encodeURIComponent(query);
     fetch(url)
-      .then(res => {
+      .then((res) => {
         if (api.encoding === 'gbk') {
-          return res.arrayBuffer().then(buf => {
+          return res.arrayBuffer().then((buf) => {
             const decoder = new TextDecoder('gbk');
             return JSON.parse(decoder.decode(buf));
           });
         }
         return res.json();
       })
-      .then(data => {
+      .then((data) => {
         const suggestions = api.parse(data);
         showSuggestions(suggestions);
       })
@@ -135,7 +135,7 @@ export function showSuggestions(suggestions) {
     .join('');
   box.style.display = 'block';
 
-  box.querySelectorAll('.suggest-item').forEach(item => {
+  box.querySelectorAll('.suggest-item').forEach((item) => {
     item.addEventListener('click', () => {
       const input = document.getElementById('searchInput');
       if (input) {
@@ -154,31 +154,33 @@ export function hideSuggestions() {
   currentSuggestIndex = -1;
 }
 
-// Keyboard navigation
-document.addEventListener('keydown', function (e) {
-  const box = document.getElementById('suggestBox');
-  if (!box || box.style.display === 'none') return;
+// Keyboard navigation (browser only; skip at module load in Node/Vitest)
+if (typeof document !== 'undefined') {
+  document.addEventListener('keydown', function (e) {
+    const box = document.getElementById('suggestBox');
+    if (!box || box.style.display === 'none') return;
 
-  if (e.key === 'ArrowDown') {
-    e.preventDefault();
-    currentSuggestIndex = Math.min(currentSuggestIndex + 1, currentSuggestions.length - 1);
-    highlightSuggestItem();
-  } else if (e.key === 'ArrowUp') {
-    e.preventDefault();
-    currentSuggestIndex = Math.max(currentSuggestIndex - 1, 0);
-    highlightSuggestItem();
-  } else if (e.key === 'Enter' && currentSuggestIndex >= 0) {
-    e.preventDefault();
-    const input = document.getElementById('searchInput');
-    if (input) {
-      input.value = currentSuggestions[currentSuggestIndex];
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      currentSuggestIndex = Math.min(currentSuggestIndex + 1, currentSuggestions.length - 1);
+      highlightSuggestItem();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      currentSuggestIndex = Math.max(currentSuggestIndex - 1, 0);
+      highlightSuggestItem();
+    } else if (e.key === 'Enter' && currentSuggestIndex >= 0) {
+      e.preventDefault();
+      const input = document.getElementById('searchInput');
+      if (input) {
+        input.value = currentSuggestions[currentSuggestIndex];
+        hideSuggestions();
+        if (typeof window.doSearch === 'function') window.doSearch();
+      }
+    } else if (e.key === 'Escape') {
       hideSuggestions();
-      if (typeof window.doSearch === 'function') window.doSearch();
     }
-  } else if (e.key === 'Escape') {
-    hideSuggestions();
-  }
-});
+  });
+}
 
 function highlightSuggestItem() {
   const items = document.querySelectorAll('#suggestBox .suggest-item');
