@@ -18,6 +18,10 @@
     "prettier": "^3.3.3",
     "vitest": "^1.6.0"
   },
-  "keywords": ["chrome-extension", "new-tab", "minimalist"],
+  "keywords": [
+    "chrome-extension",
+    "new-tab",
+    "minimalist"
+  ],
   "license": "MIT"
 }

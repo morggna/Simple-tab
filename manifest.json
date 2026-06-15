@@ -3,11 +3,7 @@
   "name": "Simple Tab",
   "version": "5.5",
   "description": "极简导航 - 快速访问",
-  "permissions": [
-    "storage",
-    "unlimitedStorage",
-    "favicon"
-  ],
+  "permissions": ["storage", "unlimitedStorage", "favicon"],
   "optional_host_permissions": [
     "https://suggestqueries.google.com/*",
     "https://api.bing.com/*",

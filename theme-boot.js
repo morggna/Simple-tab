@@ -1,4 +1,4 @@
-(function() {
+(function () {
   try {
     var localData = localStorage.getItem('newtabData');
     var theme = localStorage.getItem('theme') || 'light';
@@ -18,5 +18,7 @@
 
     document.documentElement.style.setProperty('--opacity-light', opL);
     document.documentElement.style.setProperty('--opacity-dark', opD);
-  } catch (e) {}
+  } catch {
+    // Ignore parse/storage errors; page keeps default theme variables.
+  }
 })();
