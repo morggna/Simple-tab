@@ -30,15 +30,15 @@ export function doWebdavSync(data, silent = false) {
   const auth = btoa(`${data.webdav.user}:${data.webdav.pass}`);
   const headers = {
     Authorization: `Basic ${auth}`,
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
   };
 
   fetch(data.webdav.url, { method: 'GET', headers })
-    .then(res => {
+    .then((res) => {
       if (!res.ok && res.status !== 404) throw new Error('下载失败');
       return res.status === 404 ? null : res.text();
     })
-    .then(remoteText => {
+    .then((remoteText) => {
       const localStr = canonicalStringify(data);
       const remoteData = remoteText ? JSON.parse(remoteText) : null;
       const remoteStr = remoteData ? canonicalStringify(remoteData) : null;
@@ -50,7 +50,7 @@ export function doWebdavSync(data, silent = false) {
         showWebdavStatus('已同步', 'success');
       }
     })
-    .catch(err => {
+    .catch((err) => {
       if (!silent) showWebdavStatus('同步失败: ' + err.message, 'error');
     });
 }
@@ -82,7 +82,8 @@ export function showWebdavStatus(msg, type = 'info') {
   const el = document.getElementById('webdavStatus');
   if (!el) return;
   el.textContent = msg;
-  el.style.color = type === 'error' ? '#e74c3c' : type === 'success' ? '#27ae60' : 'var(--text-muted)';
+  el.style.color =
+    type === 'error' ? '#e74c3c' : type === 'success' ? '#27ae60' : 'var(--text-muted)';
   if (type === 'success') setTimeout(() => (el.textContent = ''), 2000);
 }
 

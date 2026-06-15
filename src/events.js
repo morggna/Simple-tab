@@ -3,13 +3,10 @@
  */
 
 import { saveData } from './storage.js';
-import { searchEngines, suggestApis, checkHostPermission, requestHostPermission } from './search.js';
 import { doSearch, setupSearchSuggestions } from './main.js'; // circular safe via re-export later
 
 let dataRef = null;
 let isEditMode = false;
-let editingGroupIndex = null;
-let suggestTimer = null;
 
 export function initEvents(data) {
   dataRef = data;
@@ -23,7 +20,6 @@ function bindGlobalEvents() {
   if (editBtn) {
     editBtn.addEventListener('click', () => {
       isEditMode = !isEditMode;
-      editingGroupIndex = isEditMode ? 0 : null;
       document.body.classList.toggle('edit-mode', isEditMode);
       editBtn.textContent = isEditMode ? '完成' : '编辑';
       if (typeof window.renderGroups === 'function') window.renderGroups();
@@ -51,7 +47,7 @@ function bindGlobalEvents() {
   // Search
   const searchInput = document.getElementById('searchInput');
   if (searchInput) {
-    searchInput.addEventListener('keydown', e => {
+    searchInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         if (typeof doSearch === 'function') doSearch();
       }
@@ -61,7 +57,7 @@ function bindGlobalEvents() {
   // Keyboard "?" shortcut is handled in main.js for simplicity
 }
 
-export function setupDragAndDrop(groupIndex) {
+export function setupDragAndDrop(_groupIndex) {
   // (original drag-drop logic moved here in future iteration)
   // For now we keep the original implementation inside main.js to avoid breakage
 }

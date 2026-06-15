@@ -4,10 +4,9 @@
  */
 
 import { saveData } from './storage.js';
-import { getIconUrl, getDomainName, getIconUrls, tryNextIcon, escapeHtml } from './utils.js';
+import { getIconUrl, getDomainName, escapeHtml } from './utils.js';
 
 let dataRef = null;
-let editingGroupIndex = null;
 let currentGroupIndex = null;
 let currentLinkIndex = null;
 let customIconBase64 = null;
@@ -21,9 +20,8 @@ export function applyThemeAndOpacity() {
   const theme = dataRef.theme || 'light';
   root.setAttribute('data-theme', theme);
 
-  const opacity = theme === 'dark' 
-    ? (dataRef.opacityDark ?? 85) / 100 
-    : (dataRef.opacityLight ?? 85) / 100;
+  const opacity =
+    theme === 'dark' ? (dataRef.opacityDark ?? 85) / 100 : (dataRef.opacityLight ?? 85) / 100;
 
   root.style.setProperty('--opacity-light', opacity);
   root.style.setProperty('--opacity-dark', opacity);
@@ -41,7 +39,7 @@ export function applyBackground() {
 }
 
 export function renderSearchEngine() {
-  document.querySelectorAll('.search-engine').forEach(el => {
+  document.querySelectorAll('.search-engine').forEach((el) => {
     el.classList.toggle('active', el.dataset.engine === dataRef.searchEngine);
   });
 }
@@ -176,7 +174,7 @@ export function saveLink() {
   const name = document.getElementById('linkName').value.trim();
   if (!url) return;
 
-  let finalUrl = url.startsWith('http') ? url : 'https://' + url;
+  const finalUrl = url.startsWith('http') ? url : 'https://' + url;
   const finalName = name || getDomainName(finalUrl);
 
   if (currentLinkIndex !== null) {
