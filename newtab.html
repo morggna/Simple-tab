@@ -20,24 +20,40 @@
       }
 
       html {
-        background: #e8e4dc;
+        background: #faf9f5;
       }
 
       @media (prefers-color-scheme: dark) {
         html {
-          background: #1a1a2e;
+          background: #141413;
         }
       }
 
       :root {
-        --bg-primary: linear-gradient(180deg, #e8e4dc 0%, #f5f1e8 100%);
-        --bg-card: rgba(255, 255, 255, var(--opacity-light, 0.85));
-        --text-primary: #333;
-        --text-secondary: #444;
-        --text-muted: #888;
-        --border-color: #eee;
-        --shadow: rgba(0, 0, 0, 0.06);
-        --accent: #3498db;
+        --bg-primary: linear-gradient(180deg, #faf9f5 0%, #f5f4ed 100%);
+        --bg-card: rgba(250, 249, 245, var(--opacity-light, 0.85));
+        --text-primary: #141413;
+        --text-secondary: #30302e;
+        --text-muted: #5e5d59;
+        --border-color: #d8d5cc;
+        --border-strong: #b0aea5;
+        --shadow: rgba(20, 20, 19, 0.08);
+        --accent: #141413;
+        --accent-hover: #30302e;
+        --accent-contrast: #faf9f5;
+        --accent-muted: rgba(20, 20, 19, 0.08);
+        --surface-elevated: #faf9f5;
+        --surface-input: var(--bg-card);
+        --surface-secondary: rgba(176, 174, 165, 0.18);
+        --surface-secondary-hover: rgba(176, 174, 165, 0.28);
+        --surface-preview: rgba(245, 244, 237, 0.88);
+        --surface-preview-text: #5e5d59;
+        --control-border: #b0aea5;
+        --control-muted: #77756f;
+        --status-muted: #77756f;
+        --danger: #e74c3c;
+        --danger-contrast: #fff;
+        --delete-border: #f5f4ed;
         --opacity-light: 0.85;
         --opacity-dark: 0.85;
         --font-claude-like:
@@ -46,13 +62,30 @@
       }
 
       [data-theme='dark'] {
-        --bg-primary: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
-        --bg-card: rgba(30, 30, 50, var(--opacity-dark, 0.85));
-        --text-primary: #fff;
-        --text-secondary: #e0e0e0;
-        --text-muted: #aaa;
-        --border-color: rgba(255, 255, 255, 0.15);
-        --shadow: rgba(0, 0, 0, 0.3);
+        --bg-primary: linear-gradient(180deg, #1a1918 0%, #141413 100%);
+        --bg-card: rgba(31, 30, 29, var(--opacity-dark, 0.85));
+        --text-primary: #faf9f5;
+        --text-secondary: #d8d5cc;
+        --text-muted: #b0aea5;
+        --border-color: rgba(176, 174, 165, 0.16);
+        --border-strong: rgba(201, 184, 159, 0.24);
+        --shadow: rgba(5, 5, 4, 0.5);
+        --accent: #c9b89f;
+        --accent-hover: #d5c8b4;
+        --accent-contrast: #141413;
+        --accent-muted: rgba(201, 184, 159, 0.13);
+        --surface-elevated: rgba(38, 38, 36, 0.96);
+        --surface-input: rgba(250, 249, 245, 0.06);
+        --surface-secondary: rgba(94, 93, 89, 0.14);
+        --surface-secondary-hover: rgba(94, 93, 89, 0.22);
+        --surface-preview: rgba(250, 249, 245, 0.07);
+        --surface-preview-text: #d0ccc1;
+        --control-border: rgba(176, 174, 165, 0.28);
+        --control-muted: #b0aea5;
+        --status-muted: var(--text-muted);
+        --danger: #c9877b;
+        --danger-contrast: #141413;
+        --delete-border: #30302e;
       }
 
       body {
@@ -77,7 +110,7 @@
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-        background-color: #1a1a2e;
+        background-color: #141413;
       }
 
       /* 搜索框 */
@@ -132,7 +165,7 @@
       .search-btn {
         width: 48px;
         height: 48px;
-        background: #3498db;
+        background: var(--accent);
         border: none;
         border-radius: 50%;
         cursor: pointer;
@@ -144,13 +177,13 @@
       }
 
       .search-btn:hover {
-        background: #2980b9;
+        background: var(--accent-hover);
       }
 
       .search-btn svg {
         width: 20px;
         height: 20px;
-        fill: #fff;
+        fill: var(--accent-contrast);
       }
 
       /* 搜索建议 */
@@ -161,38 +194,42 @@
         left: 0;
         right: 0;
         margin-top: 8px;
-        background: #fff;
+        background: var(--surface-elevated);
         border-radius: 16px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        box-shadow:
+          0 16px 42px var(--shadow),
+          0 0 0 1px var(--border-color);
         overflow: hidden;
         z-index: 50;
       }
 
       [data-theme='dark'] .suggestions-container {
-        background: #2a2a3e;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        background: var(--surface-elevated);
+        box-shadow:
+          0 18px 45px var(--shadow),
+          0 0 0 1px var(--border-color);
       }
 
       .suggestion-item {
         padding: 12px 20px;
         cursor: pointer;
         font-size: 14px;
-        color: #333;
+        color: var(--text-primary);
         transition: background 0.15s;
       }
 
       [data-theme='dark'] .suggestion-item {
-        color: #e0e0e0;
+        color: var(--text-secondary);
       }
 
       .suggestion-item:hover,
       .suggestion-item.active {
-        background: rgba(52, 152, 219, 0.1);
+        background: var(--accent-muted);
       }
 
       [data-theme='dark'] .suggestion-item:hover,
       [data-theme='dark'] .suggestion-item.active {
-        background: rgba(52, 152, 219, 0.25);
+        background: var(--accent-muted);
       }
 
       /* 分组区域 */
@@ -211,7 +248,7 @@
       .group-indicator {
         width: 4px;
         height: 18px;
-        background: #3498db;
+        background: var(--accent);
         border-radius: 2px;
       }
 
@@ -244,7 +281,7 @@
 
       .group-edit-icon:hover {
         color: var(--accent);
-        background: rgba(52, 152, 219, 0.1);
+        background: var(--accent-muted);
       }
 
       .group-actions {
@@ -258,7 +295,7 @@
       }
 
       .group-action-btn {
-        background: rgba(0, 0, 0, 0.05);
+        background: var(--surface-secondary);
         border: none;
         border-radius: 4px;
         padding: 4px 10px;
@@ -268,25 +305,27 @@
       }
 
       [data-theme='dark'] .group-action-btn {
-        background: rgba(255, 255, 255, 0.1);
+        background: var(--surface-secondary);
+        color: var(--text-muted);
       }
 
       .group-action-btn:hover {
-        background: rgba(0, 0, 0, 0.1);
+        background: var(--surface-secondary-hover);
         color: var(--text-secondary);
       }
 
       [data-theme='dark'] .group-action-btn:hover {
-        background: rgba(255, 255, 255, 0.15);
+        background: var(--surface-secondary-hover);
+        color: var(--text-secondary);
       }
 
       .group-action-btn.editing {
-        background: #3498db;
-        color: #fff;
+        background: var(--accent);
+        color: var(--accent-contrast);
       }
 
       .group-action-btn.editing:hover {
-        background: #2980b9;
+        background: var(--accent-hover);
       }
 
       .delete-group-btn {
@@ -298,12 +337,12 @@
       }
 
       .group-section.editing .edit-group-btn {
-        background: #3498db;
-        color: #fff;
+        background: var(--accent);
+        color: var(--accent-contrast);
       }
 
       .group-section.editing .edit-group-btn:hover {
-        background: #2980b9;
+        background: var(--accent-hover);
       }
 
       /* 链接列表 - 横向排列 */
@@ -386,7 +425,7 @@
 
       .link-edit-icon:hover {
         color: var(--accent);
-        background: rgba(52, 152, 219, 0.1);
+        background: var(--accent-muted);
       }
 
       .link-delete {
@@ -395,10 +434,10 @@
         right: -5px;
         width: 18px;
         height: 18px;
-        background: #e74c3c;
-        border: 2px solid #f5f1e8;
+        background: var(--danger);
+        border: 2px solid var(--delete-border);
         border-radius: 50%;
-        color: #fff;
+        color: var(--danger-contrast);
         font-size: 10px;
         cursor: pointer;
         display: none;
@@ -417,12 +456,12 @@
         align-items: center;
         justify-content: center;
         background: transparent;
-        border: 1.5px dashed #ccc;
+        border: 1.5px dashed var(--control-border);
         border-radius: 10px;
         padding: 12px 24px;
         min-width: 80px;
         cursor: pointer;
-        color: #aaa;
+        color: var(--control-muted);
         font-size: 18px;
         transition: all 0.15s;
       }
@@ -432,8 +471,8 @@
       }
 
       .add-link-btn:hover {
-        border-color: #3498db;
-        color: #3498db;
+        border-color: var(--accent);
+        color: var(--accent);
       }
 
       /* 添加分组按钮 */
@@ -442,18 +481,18 @@
         align-items: center;
         gap: 6px;
         background: transparent;
-        border: 1.5px dashed #ccc;
+        border: 1.5px dashed var(--control-border);
         border-radius: 8px;
         padding: 8px 16px;
         cursor: pointer;
-        color: #999;
+        color: var(--text-muted);
         font-size: 13px;
         margin-top: 10px;
       }
 
       .add-group-btn:hover {
-        border-color: #3498db;
-        color: #3498db;
+        border-color: var(--accent);
+        color: var(--accent);
       }
 
       /* 拖拽样式 */
@@ -471,7 +510,7 @@
       }
 
       .link-card.drag-over {
-        border: 2px dashed #3498db;
+        border: 2px dashed var(--accent);
       }
 
       /* 分组拖拽样式 */
@@ -480,7 +519,7 @@
       }
 
       .group-section.drag-over-group {
-        border-top: 2px dashed #3498db;
+        border-top: 2px dashed var(--accent);
         padding-top: 10px;
       }
 
@@ -553,11 +592,16 @@
         max-width: 400px;
         max-height: 80vh;
         overflow-y: auto;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        box-shadow:
+          0 24px 70px var(--shadow),
+          0 0 0 1px var(--border-color);
       }
 
       [data-theme='dark'] .modal-content {
-        background: #2a2a3e;
+        background: var(--surface-elevated);
+        box-shadow:
+          0 24px 70px var(--shadow),
+          0 0 0 1px var(--border-color);
       }
 
       .modal-header {
@@ -616,13 +660,15 @@
 
       [data-theme='dark'] .form-group input,
       [data-theme='dark'] .form-group select {
-        background: rgba(255, 255, 255, 0.05);
+        background: var(--surface-input);
+        border-color: var(--border-color);
       }
 
       .form-group input:focus,
       .form-group select:focus {
         outline: none;
         border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-muted);
       }
 
       .form-group input::placeholder {
@@ -634,7 +680,8 @@
         align-items: center;
         gap: 10px;
         padding: 10px 12px;
-        background: #f9f9f9;
+        background: var(--surface-preview);
+        border: 1px solid var(--border-color);
         border-radius: 8px;
         margin-top: 8px;
       }
@@ -648,7 +695,7 @@
 
       .icon-preview span {
         font-size: 13px;
-        color: #666;
+        color: var(--surface-preview-text);
       }
 
       .btn {
@@ -662,21 +709,25 @@
       }
 
       .btn-primary {
-        background: #3498db;
-        color: #fff;
+        background: var(--accent);
+        color: var(--accent-contrast);
       }
 
       .btn-primary:hover {
-        background: #2980b9;
+        background: var(--accent-hover);
       }
 
       .btn-secondary {
-        background: #f0f0f0;
-        color: #555;
+        background: var(--surface-secondary);
+        color: var(--text-secondary);
       }
 
       .btn-secondary:hover {
-        background: #e5e5e5;
+        background: var(--surface-secondary-hover);
+      }
+
+      [data-theme='dark'] .btn-secondary {
+        color: var(--text-secondary);
       }
 
       .btn-group {
@@ -692,7 +743,7 @@
       .settings-section {
         margin-bottom: 20px;
         padding-bottom: 16px;
-        border-bottom: 1px solid #eee;
+        border-bottom: 1px solid var(--border-color);
       }
 
       .settings-section:last-child {
@@ -703,7 +754,7 @@
 
       .settings-section-title {
         font-size: 11px;
-        color: #999;
+        color: var(--text-muted);
         margin-bottom: 12px;
         text-transform: uppercase;
         letter-spacing: 1px;
@@ -827,7 +878,9 @@
             >
               上传图标
             </button>
-            <span id="customIconStatus" style="font-size: 12px; color: #999">未选择</span>
+            <span id="customIconStatus" style="font-size: 12px; color: var(--status-muted)"
+              >未选择</span
+            >
           </div>
           <input type="file" id="iconFileInput" accept="image/*" style="display: none" />
           <div id="customIconPreview" style="display: none; margin-top: 8px">
