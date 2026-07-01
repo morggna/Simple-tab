@@ -52,6 +52,7 @@ function createBrowserSandbox() {
     documentElement: {
       style: { setProperty: noop },
       classList: { add: noop, remove: noop },
+      removeAttribute: noop,
     },
     createElement: () => {
       let text = '';
@@ -207,5 +208,73 @@ describe('main.js renderGroups XSS regression', () => {
     expect(ctx.document.getElementById('customIconImg').src).toBe('');
     expect(ctx.document.getElementById('customIconStatus').textContent).toBe('图标已被过滤');
     expect(ctx.document.getElementById('customIconPreview').style.display).toBe('none');
+  });
+
+  it('moves a dragged link into another group at the target position', () => {
+    ctx.data = {
+      groups: [
+        {
+          name: 'Work',
+          icon: '💻',
+          links: [
+            { name: 'Docs', url: 'https://docs.example.com' },
+            { name: 'Repo', url: 'https://repo.example.com' },
+          ],
+        },
+        {
+          name: 'Read later',
+          icon: '⭐',
+          links: [
+            { name: 'Article', url: 'https://article.example.com' },
+            { name: 'Video', url: 'https://video.example.com' },
+          ],
+        },
+      ],
+      searchEngine: 'google',
+      bgUrl: '',
+      theme: 'light',
+      opacityLight: 85,
+      opacityDark: 85,
+      webdav: { url: '', user: '', pass: '' },
+    };
+
+    expect(typeof ctx.moveLinkBetweenGroups).toBe('function');
+    expect(ctx.moveLinkBetweenGroups(0, 1, 1, 1)).toBe(true);
+
+    expect(ctx.data.groups[0].links).toEqual([{ name: 'Docs', url: 'https://docs.example.com' }]);
+    expect(ctx.data.groups[1].links).toEqual([
+      { name: 'Article', url: 'https://article.example.com' },
+      { name: 'Repo', url: 'https://repo.example.com' },
+      { name: 'Video', url: 'https://video.example.com' },
+    ]);
+  });
+
+  it('appends a dragged link when dropped onto an empty group row', () => {
+    ctx.data = {
+      groups: [
+        {
+          name: 'Work',
+          icon: '💻',
+          links: [{ name: 'Docs', url: 'https://docs.example.com' }],
+        },
+        {
+          name: 'Read later',
+          icon: '⭐',
+          links: [],
+        },
+      ],
+      searchEngine: 'google',
+      bgUrl: '',
+      theme: 'light',
+      opacityLight: 85,
+      opacityDark: 85,
+      webdav: { url: '', user: '', pass: '' },
+    };
+
+    expect(typeof ctx.moveLinkBetweenGroups).toBe('function');
+    expect(ctx.moveLinkBetweenGroups(0, 0, 1)).toBe(true);
+
+    expect(ctx.data.groups[0].links).toHaveLength(0);
+    expect(ctx.data.groups[1].links).toEqual([{ name: 'Docs', url: 'https://docs.example.com' }]);
   });
 });

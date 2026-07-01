@@ -625,6 +625,9 @@ function bindEvents() {
       '.group-section[data-group-index="' + editingGroupIndex + '"]'
     );
     if (editingSection) {
+      document.querySelectorAll('.group-section').forEach(function (section) {
+        section.classList.add('link-drop-target');
+      });
       editingSection.classList.add('editing');
       setupDragAndDrop(editingGroupIndex);
       setupGroupDragAndDrop();
@@ -633,18 +636,50 @@ function bindEvents() {
 }
 
 function setupDragAndDrop(groupIndex) {
-  var linksRow = document.querySelector('.links-row[data-group-index="' + groupIndex + '"]');
-  if (!linksRow) return;
-  var linkCards = linksRow.querySelectorAll('.link-card');
-  linkCards.forEach(function (card) {
-    card.setAttribute('draggable', 'true');
+  var sourceRow = document.querySelector('.links-row[data-group-index="' + groupIndex + '"]');
+  if (!sourceRow) return;
+  var allRows = document.querySelectorAll('.links-row');
+  var allCards = document.querySelectorAll('.link-card');
+  allRows.forEach(function (row) {
+    row.addEventListener('dragover', function (e) {
+      if (editingGroupIndex === null || !hasLinkDragData(e)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      this.classList.add('drag-over-row');
+    });
+    row.addEventListener('dragleave', function () {
+      this.classList.remove('drag-over-row');
+    });
+    row.addEventListener('drop', function (e) {
+      if (editingGroupIndex === null || !hasLinkDragData(e)) return;
+      e.preventDefault();
+      this.classList.remove('drag-over-row');
+      var sourceData = getLinkDragData(e);
+      if (!sourceData) return;
+      var targetGroupIndex = parseInt(this.getAttribute('data-group-index'), 10);
+      if (
+        moveLinkBetweenGroups(
+          sourceData.groupIndex,
+          sourceData.linkIndex,
+          targetGroupIndex,
+          undefined
+        )
+      ) {
+        saveData();
+        renderGroups();
+      }
+    });
+  });
+  allCards.forEach(function (card) {
+    var isSourceCard = parseInt(card.getAttribute('data-group'), 10) === groupIndex;
+    card.setAttribute('draggable', isSourceCard ? 'true' : 'false');
     card.addEventListener('click', function (e) {
-      if (editingGroupIndex !== null) {
+      if (editingGroupIndex !== null && isSourceCard) {
         e.preventDefault();
       }
     });
     card.addEventListener('dragstart', function (e) {
-      if (editingGroupIndex === null) {
+      if (editingGroupIndex === null || !isSourceCard) {
         e.preventDefault();
         return;
       }
@@ -663,9 +698,12 @@ function setupDragAndDrop(groupIndex) {
       document.querySelectorAll('.link-card').forEach(function (c) {
         c.classList.remove('drag-over');
       });
+      document.querySelectorAll('.links-row').forEach(function (row) {
+        row.classList.remove('drag-over-row');
+      });
     });
     card.addEventListener('dragover', function (e) {
-      if (editingGroupIndex === null) return;
+      if (editingGroupIndex === null || !hasLinkDragData(e)) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       this.classList.add('drag-over');
@@ -674,26 +712,73 @@ function setupDragAndDrop(groupIndex) {
       this.classList.remove('drag-over');
     });
     card.addEventListener('drop', function (e) {
-      if (editingGroupIndex === null) return;
+      if (editingGroupIndex === null || !hasLinkDragData(e)) return;
       e.preventDefault();
+      e.stopPropagation();
       this.classList.remove('drag-over');
-      var sourceData = JSON.parse(e.dataTransfer.getData('text/plain'));
-      var targetGroupIndex = parseInt(this.getAttribute('data-group'));
-      var targetLinkIndex = parseInt(this.getAttribute('data-link'));
-      var sourceGroupIndex = parseInt(sourceData.groupIndex);
-      var sourceLinkIndex = parseInt(sourceData.linkIndex);
-      if (sourceGroupIndex === targetGroupIndex && sourceLinkIndex === targetLinkIndex) {
-        return;
-      }
-      if (sourceGroupIndex === targetGroupIndex) {
-        var links = data.groups[sourceGroupIndex].links;
-        var movedLink = links.splice(sourceLinkIndex, 1)[0];
-        links.splice(targetLinkIndex, 0, movedLink);
+      var sourceData = getLinkDragData(e);
+      if (!sourceData) return;
+      var targetGroupIndex = parseInt(this.getAttribute('data-group'), 10);
+      var targetLinkIndex = parseInt(this.getAttribute('data-link'), 10);
+      if (
+        moveLinkBetweenGroups(
+          sourceData.groupIndex,
+          sourceData.linkIndex,
+          targetGroupIndex,
+          targetLinkIndex
+        )
+      ) {
         saveData();
         renderGroups();
       }
     });
   });
+}
+function hasLinkDragData(e) {
+  if (!e.dataTransfer || !e.dataTransfer.types) return false;
+  return Array.prototype.indexOf.call(e.dataTransfer.types, 'text/plain') !== -1;
+}
+function getLinkDragData(e) {
+  try {
+    var parsed = JSON.parse(e.dataTransfer.getData('text/plain'));
+    return {
+      groupIndex: parseInt(parsed.groupIndex, 10),
+      linkIndex: parseInt(parsed.linkIndex, 10),
+    };
+  } catch (err) {
+    return null;
+  }
+}
+function moveLinkBetweenGroups(
+  sourceGroupIndex,
+  sourceLinkIndex,
+  targetGroupIndex,
+  targetLinkIndex
+) {
+  sourceGroupIndex = parseInt(sourceGroupIndex, 10);
+  sourceLinkIndex = parseInt(sourceLinkIndex, 10);
+  targetGroupIndex = parseInt(targetGroupIndex, 10);
+  targetLinkIndex = parseInt(targetLinkIndex, 10);
+  if (
+    Number.isNaN(sourceGroupIndex) ||
+    Number.isNaN(sourceLinkIndex) ||
+    Number.isNaN(targetGroupIndex) ||
+    !data.groups[sourceGroupIndex] ||
+    !data.groups[targetGroupIndex] ||
+    !data.groups[sourceGroupIndex].links[sourceLinkIndex]
+  ) {
+    return false;
+  }
+  if (sourceGroupIndex === targetGroupIndex && sourceLinkIndex === targetLinkIndex) {
+    return false;
+  }
+  var sourceLinks = data.groups[sourceGroupIndex].links;
+  var movedLink = sourceLinks.splice(sourceLinkIndex, 1)[0];
+  var targetLinks = data.groups[targetGroupIndex].links;
+  var insertIndex = Number.isNaN(targetLinkIndex) ? targetLinks.length : targetLinkIndex;
+  insertIndex = Math.max(0, Math.min(insertIndex, targetLinks.length));
+  targetLinks.splice(insertIndex, 0, movedLink);
+  return true;
 }
 function setupGroupDragAndDrop() {
   var groupSections = document.querySelectorAll('.group-section');
@@ -840,6 +925,7 @@ function openEditLinkModal(gIdx, lIdx) {
 function closeLinkModal() {
   document.getElementById('linkModal').classList.remove('active');
   currentGroupIndex = null;
+  currentLinkIndex = null;
 }
 function saveLink() {
   var url = document.getElementById('linkUrl').value.trim();
